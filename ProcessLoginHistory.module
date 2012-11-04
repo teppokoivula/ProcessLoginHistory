@@ -182,15 +182,16 @@ class ProcessLoginHistory extends Process {
         if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $object->device = "mobile";
         else if (preg_match("/iPad/i", $user_agent)) $object->device = "tablet";
 
-        // identifiable browser strings
-        $browsers = array(
-            'firefox', 'msie', 'opera', 'chrome', 'safari', 'mozilla', 'seamonkey', 'konqueror', 'netscape',
-            'gecko', 'navigator', 'mosaic', 'lynx', 'amaya', 'omniweb', 'avant', 'camino', 'flock', 'aol'
-        );
-
         // identify platform
-        if (preg_match("/\(([a-zA-Z0-9\.\;\: ]+)\).*/", $user_agent, $match)) {
-            $object->platform = strtok($match[1], " ");
+        if (preg_match("/\(([a-zA-Z0-9\.\;\:\/\- ]+)\)/", $user_agent, $match)) {
+	        if (strstr($match[1], "Windows")) {
+		        $object->platform = "Windows";
+	        } else {
+		        $object->platform = str_replace(";", "", strtok($match[1], " "));
+		        if ($object->platform == "Linux") {
+			        if (strstr($match[1], "Android")) $object->platform = "Android";
+		        }
+	        }
         }
 
         // identify version number (mostly for Safari and Opera)
@@ -198,12 +199,23 @@ class ProcessLoginHistory extends Process {
             $object->version = $match[1];
         }
 
+        // identifiable browser strings
+        $browsers = array(
+            'firefox', 'msie', 'opera', 'chrome', 'safari', 'mozilla', 'seamonkey', 'konqueror', 'netscape',
+            'gecko', 'navigator', 'mosaic', 'lynx', 'amaya', 'omniweb', 'avant', 'camino', 'flock', 'aol'
+        );
+
         // identify current browser
         foreach($browsers as $browser) {
-            if (preg_match("/($browser)[\/ ]?([0-9.]*)/i", $user_agent, $match)) {
-                $object->browser = $match[1];
-                if (!$object->version) $object->version = $match[2];
-                @list($object->majorver, $object->minorver, $object->revision) = explode('.', $object->version);
+            if (preg_match("/([a-z]*?[ ]?$browser)[\/ ]?([0-9.]*)/i", $user_agent, $match)) {
+	            if ($object->platform == "Android" && $match[1] == "Mobile Safari") {
+		            $object->browser = "Android Browser";
+		            $object->version = null;
+	            } else {
+		            $object->browser = $match[1];
+		            if (!$object->version) $object->version = $match[2];
+		            @list($object->majorver, $object->minorver, $object->revision) = explode('.', $object->version);
+	            }
                 break;
             }
         }
