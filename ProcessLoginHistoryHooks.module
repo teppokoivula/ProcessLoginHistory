@@ -154,7 +154,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
                 if ($event->return) $login_was_successful = 1;
             }
         }
-        if (!$user && !$this->log_nonexistent_users) return;
+        if (!$user->id && !$this->log_nonexistent_users) return;
 
         // user agent features
         if (isset($_POST['flash'])) $user_agent_features['flash'] = 1;
