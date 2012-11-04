@@ -1,0 +1,62 @@
+ul.MarkupPagerNavCustom li a {
+	margin-right: 3px;
+}
+
+table.login-history em {
+	color: #bbb;
+}
+
+table.login-history b {
+	font-size: 0.65em;
+}
+
+table.login-history tr.open td {
+	border-bottom: 0;
+}
+
+table.login-history tr.more td {
+	border: 0;
+}
+
+table.login-history tr.more div {
+	color: #6195ba;
+	font-size: 0.85em;
+	border-radius: 5px;
+	border: 1px solid #dbe3e5;
+	padding: 8px 10px 14px 55px;
+	text-shadow: 1px 1px 0 #f1f8fa;
+	background: url('img/desktop.png') 10px 10px no-repeat #e9eff1;
+}
+
+table.login-history tr#device-type td:first-letter {
+	text-transform: uppercase;
+}
+
+table.login-history tr.more.mobile-device div {
+	background-image: url('img/mobile.png');
+}
+
+table.login-history tr.more.tablet-device div {
+	background-image: url('img/tablet.png');
+}
+
+table.login-history tr.more table {
+	margin: 0;
+}
+
+table.login-history tr.more table th,
+table.login-history tr.more table td {
+	padding-right: 20px;
+	border-bottom: 0;
+	font-size: 1em;
+}
+
+table.login-history tr.more table th:hover {
+	color: #777 !important;
+	text-decoration: none;
+	cursor: auto;
+}
+
+table.login-history span {
+	display: none;
+}
