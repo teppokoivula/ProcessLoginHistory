@@ -34,7 +34,7 @@ class ProcessLoginHistory extends Process {
             'summary' => 'Keep track of site login history',
             'href' => 'http://modules.processwire.com/',
             'author' => 'Teppo Koivula',
-            'version' => 080,
+            'version' => 80,
             'singular' => true,
             'autoload' => false,
             'installs' => 'ProcessLoginHistoryHooks'
