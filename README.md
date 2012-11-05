@@ -1,8 +1,8 @@
 Process Login History Module
 ============================
 
-This module keeps record of login attempts to your site, both succesful and
-unsuccesful (tracking unsuccesful logins is off by default) in order to offer
+This module keeps track of login attempts to your site, both successful and
+unsuccessful (tracking unsuccessful logins is off by default) in order to offer
 better understanding about users' activity and environments they use / favor;
 browsers, browser features such as Flash / JavaScript, devices, screen and
 window sizes.
@@ -68,7 +68,7 @@ for later releases (probably not in this order though):
 * support for PHP's native get_browser()
 * support for Browser Capabilities PHP Project / phpbrowscap
   (https://github.com/GaretJax/phpbrowscap)
-* filter saved results (real/removed/nonexistent users, failed/succesful
+* filter saved results (real/removed/nonexistent users, failed/successful
   login attempts etc.)
 
 ## Icons
