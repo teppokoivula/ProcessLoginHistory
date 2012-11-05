@@ -3,8 +3,8 @@
 /**
  * Process Login History
  *
- * This module keeps record of login attempts to your site, both succesful and
- * unsuccesful (tracking unsuccesful logins is off by default) in order to offer
+ * This module keeps track of login attempts to your site, both successful and
+ * unsuccessful (tracking unsuccesful logins is off by default) in order to offer
  * better understanding about users' activity and environments they use / favor;
  * browsers, browser features such as Flash / JavaScript, devices, screen and
  * window sizes.
@@ -34,7 +34,7 @@ class ProcessLoginHistory extends Process {
             'summary' => 'Keep track of site login history',
             'href' => 'http://modules.processwire.com/',
             'author' => 'Teppo Koivula',
-            'version' => 80,
+            'version' => 82,
             'singular' => true,
             'autoload' => false,
             'installs' => 'ProcessLoginHistoryHooks'
@@ -70,7 +70,7 @@ class ProcessLoginHistory extends Process {
         $table->headerRow(array(
                 'User',
                 'When',
-                'Succesful attempt?',
+                'Successful attempt?',
                 'More'
             ));
 
