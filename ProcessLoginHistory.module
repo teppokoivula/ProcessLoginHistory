@@ -180,17 +180,16 @@ class ProcessLoginHistory extends Process {
         
         // very rough device type detection
         if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $object->device = "mobile";
-        else if (preg_match("/iPad/i", $user_agent)) $object->device = "tablet";
+        else if (preg_match("/iPad|Tablet/i", $user_agent)) $object->device = "tablet";
 
         // identify platform
-        if (preg_match("/\(([a-zA-Z0-9\.\;\:\/\- ]+)\)/", $user_agent, $match)) {
+        if (preg_match("/\(([a-zA-Z0-9\.;:\/-_ ]+)\)/", $user_agent, $match)) {
 	        if (strstr($match[1], "Windows")) {
 		        $object->platform = "Windows";
 	        } else {
 		        $object->platform = str_replace(";", "", strtok($match[1], " "));
-		        if ($object->platform == "Linux") {
-			        if (strstr($match[1], "Android")) $object->platform = "Android";
-		        }
+		        if (strstr($match[1], "Android")) $object->platform = "Android";
+		        else if (strstr($match[1], "Linux")) $object->platform = "Linux";
 	        }
         }
 
