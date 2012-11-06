@@ -7,7 +7,7 @@
  * handles saving data to related database table. Separated from main module
  * to keep ProcessWire from autoloading as much unnecessary code as possible.
  * 
- * For detailed information, installation instructions etc. see README.md file.
+ * For detailed information, installation instructions etc. see README.md.
  *
  * @copyright Copyright (c) 2012, Teppo Koivula
  *
@@ -30,7 +30,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         return array(
             'title' => 'Login History Hooks',
             'summary' => 'Add hooks required by Login History Process Module',
-            'href' => 'http://modules.processwire.com/',
+            'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
             'version' => 80,
             'singular' => true,
@@ -107,7 +107,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         // hook after ProcessLogin::buildLoginForm to add useful extra fields
         $this->addHookAfter('ProcessLogin::buildLoginForm', $this, 'hookBuildLoginForm');
 
-        // hook after ProcessController::execute to include a JS file (admin only)
+        // hook after ProcessController::execute to include a JavaScript file (admin only)
         $this->addHookAfter('ProcessController::execute', $this, 'hookExecute');
 
     }

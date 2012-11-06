@@ -9,7 +9,7 @@
  * browsers, browser features such as Flash / JavaScript, devices, screen and
  * window sizes.
  *
- * For detailed information, installation instructions etc. see README.md file.
+ * For detailed information, installation instructions etc. see README.md.
  *
  * @copyright Copyright (c) 2012, Teppo Koivula
  *
@@ -32,7 +32,7 @@ class ProcessLoginHistory extends Process {
         return array(
             'title' => 'Login History',
             'summary' => 'Keep track of site login history',
-            'href' => 'http://modules.processwire.com/',
+            'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
             'version' => 82,
             'singular' => true,
