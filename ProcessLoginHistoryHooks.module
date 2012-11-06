@@ -147,7 +147,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         $username = mysqli_real_escape_string($this->db, htmlentities($event->arguments[0]));
 
         // try to get user matching given username
-        if ($username == $this->sanitizer->pageName($username)) {
+        if (strtolower($username) == $this->sanitizer->pageName($username)) {
             $user = $this->users->get($username);
             if ($user->id) {
                 $user_id = $user->id;
