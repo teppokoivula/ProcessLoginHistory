@@ -32,7 +32,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Add hooks required by Login History Process Module',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 80,
+            'version' => 81,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
