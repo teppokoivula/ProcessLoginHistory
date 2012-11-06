@@ -168,34 +168,35 @@ class ProcessLoginHistory extends Process {
 
         if (!$user_agent) return null;
 
-        // empty container object
-        $object = new stdClass();
-        $object->browser = 'unknown';
-        $object->version = null;
-        $object->majorver = 0;
-        $object->minorver = 0;
-        $object->revision = 0;
-        $object->platform = 'unknown';
-        $object->device = 'desktop';
+        // empty container object for browser info
+        $b = new stdClass();
+        $b->browser = 'unknown';
+        $b->version = null;
+        $b->majorver = 0;
+        $b->minorver = 0;
+        $b->revision = 0;
+        $b->platform = 'unknown';
+        $b->device = 'desktop';
         
         // very rough device type detection
-        if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $object->device = "mobile";
-        else if (preg_match("/iPad|Tablet/i", $user_agent)) $object->device = "tablet";
+        if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $b->device = "mobile";
+        else if (preg_match("/iPad|Tablet/i", $user_agent)) $b->device = "tablet";
 
         // identify platform
-        if (preg_match("/\(([a-zA-Z0-9\.;:\/-_ ]+)\)/", $user_agent, $match)) {
+        if (preg_match("/\(([a-zA-Z0-9\.;:\/\-_ ]+)\)/", $user_agent, $match)) {
 	        if (strstr($match[1], "Windows")) {
-		        $object->platform = "Windows";
+		        $b->platform = "Windows";
 	        } else {
-		        $object->platform = str_replace(";", "", strtok($match[1], " "));
-		        if (strstr($match[1], "Android")) $object->platform = "Android";
-		        else if (strstr($match[1], "Linux")) $object->platform = "Linux";
+		        $b->platform = strtok($match[1], ";");
+		        if (strstr($match[1], "Android")) {
+			        $b->platform = (preg_match("/Android[ 0-9\.]*/", $match[1], $match)) ? $match[0] : "Android";
+		        }
 	        }
         }
 
         // identify version number (mostly for Safari and Opera)
         if (preg_match("/version\/([0-9.]*)/i", $user_agent, $match)) {
-            $object->version = $match[1];
+            $b->version = $match[1];
         }
 
         // identifiable browser strings
@@ -207,19 +208,19 @@ class ProcessLoginHistory extends Process {
         // identify current browser
         foreach($browsers as $browser) {
             if (preg_match("/([a-z]*?[ ]?$browser)[\/ ]?([0-9.]*)/i", $user_agent, $match)) {
-	            if ($object->platform == "Android" && $match[1] == "Mobile Safari") {
-		            $object->browser = "Android Browser";
-		            $object->version = null;
-	            } else {
-		            $object->browser = $match[1];
-		            if (!$object->version) $object->version = $match[2];
-		            @list($object->majorver, $object->minorver, $object->revision) = explode('.', $object->version);
-	            }
+	            $b->browser = $match[1];
+	            if (!$b->version) $b->version = $match[2];
+	            @list($b->majorver, $b->minorver, $b->revision) = explode('.', $b->version);
                 break;
             }
         }
 
-        return $object;
+        // special case: android browser reports itself as mobile safari
+        if (strpos($b->platform, "Android") !== false && $match[1] == "Mobile Safari") {
+	        $b->browser = "Android Browser";
+        }
+
+        return $b;
 
     }
 
