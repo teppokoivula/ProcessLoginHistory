@@ -32,7 +32,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 90,
+            'version' => 91,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -120,7 +120,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         if (!$this->history_max_age) return;
 
-        $interval = $this->db->escape_string($this->history_max_age),
+        $interval = $this->db->escape_string($this->history_max_age);
         $sql = "DELETE FROM " . self::TABLE_NAME . " WHERE login_timestamp < DATE_SUB(NOW(), INTERVAL $interval)";
         $this->db->query($sql);
 
