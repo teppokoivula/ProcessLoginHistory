@@ -21,8 +21,8 @@
  *
  */
  
-class ProcessLoginHistory extends Process {
-
+class ProcessLoginHistory extends Process implements ConfigurableModule {
+    
     /**
      * Return information about this module (required)
      *
@@ -34,19 +34,88 @@ class ProcessLoginHistory extends Process {
             'summary' => 'Keep track of site login history',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 83,
+            'version' => 90,
             'singular' => true,
             'autoload' => false,
             'installs' => 'ProcessLoginHistoryHooks'
         ); 
     }
-
+    
+    /**
+     * Default configuration for this module
+     *
+     * The point of putting this in it's own function is so that you don't have to specify
+     * these defaults more than once.
+     *
+     * @return array
+     */
+    static public function getDefaultData() {
+        return array(
+            'row_limit' => 25,
+            'date_format' => 'Y-m-d H:i:s'
+        );
+    }
+    
     /**
      * Names of admin page and database table used by this module
      *
      */
     const PAGE_NAME = 'login-history';
     const TABLE_NAME = 'process_login_history';
+
+    /**
+     * Populate the default config data
+     *
+     * ProcessWire will automatically overwrite it with anything the user has specifically configured.
+     * This is done in construct() rather than init() because ProcessWire populates config data after
+     * construct(), but before init().
+     *
+     */
+    public function __construct() {
+        foreach(self::getDefaultData() as $key => $value) {
+            $this->$key = $value;
+        }
+    }
+
+    /**
+     * Module configuration
+     *
+     * @param array $data
+     * @return InputfieldWrapper
+     */
+    static public function getModuleConfigInputfields(array $data) {
+
+        // this is a container for fields, basically like a fieldset
+        $fields = new InputfieldWrapper();
+
+        // since this is a static function, we can't use $this->modules, so get them from the global wire() function
+        $modules = wire('modules');
+
+        // merge default config settings (custom values overwrite defaults)
+        $defaults = self::getDefaultData();
+        $data = array_merge($defaults, $data);
+
+        // date format used
+        $field = $modules->get("InputfieldText");
+        $field->name = "date_format";
+        $field->label = "Date Format";
+        $field->notes = "See the [PHP date](http://www.php.net/manual/en/function.date.php) function reference for more information on how to customize this format.";
+        $field->value = ($data['date_format']) ? $data['date_format'] : $defaults['date_format'];
+        $field->size = 70;
+        $fields->add($field);
+
+        // number of results visible at once
+        $field = $modules->get("InputfieldSelect");
+        $field->name = "row_limit";
+        $field->label = "Row Limit";
+        $field->description = "Number of login history rows visible at once";
+        $field->required = true;
+        $field->addOptions(array(25 => '25', 50 => '50', 75 => '75', 100 => '100'));
+        $field->value = $data['row_limit'];
+        $fields->add($field);
+
+        return $fields;
+    }
 
     /**
      * Initialization function called before any execute functions
@@ -68,18 +137,22 @@ class ProcessLoginHistory extends Process {
         $table->setEncodeEntities(false);
         $table->setClass('login-history');
         $table->headerRow(array(
-                'User',
-                'When',
-                'Successful attempt?',
-                'More'
+                __('User'),
+                __('When'),
+                __('Successful attempt?'),
+                __('More')
             ));
 
         // variables required by pager
-        $limit = 25;
-        $start = (wire()->input->get->page) ? (wire()->input->get->page-1)*$limit : 0;
+        $limit = $this->row_limit;
+        $start = ($this->input->get->page) ? (int) ($this->input->get->page-1)*$limit : 0;
         $total = $this->db->query("SELECT count(*) FROM " . self::TABLE_NAME)->fetch_row();
         $total = $total[0];
         if ($start > $total) $start = $total-$limit;
+
+        // should date formatting occur?
+        $defaults = self::getDefaultData();
+        $date_format = ($this->date_format != $defaults['date_format']) ? $this->date_format : null;
 
         // fetch login history from database
         $result = $this->db->query("SELECT * FROM " . self::TABLE_NAME . " ORDER BY login_timestamp DESC LIMIT $start, $limit");
@@ -88,22 +161,32 @@ class ProcessLoginHistory extends Process {
 
             // empty container
             $data = array();
+            
+            // escape values (just a precaution really)
+            foreach ($row as $key => $value) {
+                if ($key != "user_agent_features") $row[$key] = htmlentities($value);
+            }
 
             // basic user information; if user_id is set user exists or at least existed at
             // the time of login attempt (still need to check if that's currently true though)
             if ($row['user_id']) {
                 $user = $this->users->get($row['user_id']);
-                if ($user->id) $data[$user->name] = "../../access/users/edit/?id={$user->id}";
-                else $data[] = $row['username'] . " <em>(removed)</em>";
+                if ($user->id) $data[$user->name] = $user->url;
+                else $data[] = $row['username'] . " <em>(" . __("removed") . ")</em>";
             } else {
-                $data[] = $row['username'] . " <em>(nonexistent)</em>";
+                $data[] = $row['username'] . " <em>(" . __("nonexistent") . ")</em>";
             }
 
             // timestamp (first row is hidden and only included to allow proper ordering with JavaScript)
-            $data[] = "<span>{$row['login_timestamp']}</span>" . $row['login_timestamp'];
+            $date = ($date_format) ? date($date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
+            $data[] = "<span>{$row['login_timestamp']}</span>$date";
 
             // status of login attempt
-            $data[] = ($row['login_was_successful']) ? "Yes" : "<em>No</em>";
+            if ($row['login_was_successful']) $data[] = __("Yes");
+            else $data[] = "<em>" . __("No") . "</em>";
+
+            // link for removing individual history row
+            $remove_markup = "<a href='./delete/?id={$row['id']}' class='remove'>" . __("remove?") . "</a>";
 
             // environment and user agent
             if ($row['user_agent']) {
@@ -111,23 +194,31 @@ class ProcessLoginHistory extends Process {
                 $markup = "";
                 $browser = $this->get_browser_alt($row['user_agent']);
                 $features = ($row['user_agent_features']) ? json_decode($row['user_agent_features']) : null;
+                // translation array for certain common words
+                $t = array(
+                    'enabled' => __("Enabled"),
+                    'disabled' => __("Disabled"),
+                    'unidentified' => __("unidentified")
+                );
                 // basic information from user agent string
-                $markup .= "<tr><th>Browser</th><td>{$browser->browser} {$browser->version}</td></tr>";
-                $markup .= "<tr><th>Platform</th><td>{$browser->platform}</td></tr>";
-                $markup .= "<tr id='device-type'><th>Device Type</th><td>{$browser->device}</td></tr>";
+                $markup .= "<tr><th>" . __("Browser") . "</th><td>{$browser->browser} {$browser->version}</td></tr>";
+                $markup .= "<tr><th>" . __("Platform") . "</th><td>{$browser->platform}</td></tr>";
+                $markup .= "<tr id='device-type'><th>" . __("Device Type") . "</th><td>{$browser->device}</td></tr>";
                 if ($features) {
+                    // escape values (again just a precaution)
+                    foreach ($features as &$feature) $feature = htmlentities($feature);
                     // more specific features; these depend on javascript support
-                    $markup .= "<tr><th>JavaScript</th><td>" . ((isset($features->javascript)&&$features->javascript) ? "Enabled" : "Disabled") . "</td></tr>";
-                    $markup .= "<tr><th>Flash</th><td>" . ((isset($features->flash)&&$features->flash) ? "Enabled" : "Disabled") . "</td></tr>";
-                    $markup .= "<tr><th>Screen</th><td>" . ((isset($features->screen)&&$features->screen) ? $features->screen : "unidentified" ) . "</td></tr>";
-                    $markup .= "<tr><th>Window</th><td>" . ((isset($features->window)&&$features->window) ? $features->window : "unidentified" ) . "</td></tr>";
+                    $markup .= "<tr><th>JavaScript</th><td>" . ((isset($features->javascript)&&$features->javascript) ? $t['enabled'] : $t['disabled']) . "</td></tr>";
+                    $markup .= "<tr><th>Flash</th><td>" . ((isset($features->flash)&&$features->flash) ? $t['enabled'] : $t['disabled']) . "</td></tr>";
+                    $markup .= "<tr><th>" . __("Screen") . "</th><td>" . ((isset($features->screen)&&$features->screen) ? $features->screen : $t['unidentified']) . "</td></tr>";
+                    $markup .= "<tr><th>" . __("Window") . "</th><td>" . ((isset($features->window)&&$features->window) ? $features->window : $t['unidentified']) . "</td></tr>";
                 } else {
                     // javascript-dependent feature checking has failed
-                    $markup .= "<tr><th>JavaScript</th><td>Disabled</td></tr>";
+                    $markup .= "<tr><th>JavaScript</th><td>{$t['disabled']}</td></tr>";
                 }
-                $data[] = "<table class='user-agent'>$markup</table>";
+                $data[] = "$remove_markup<table class='user-agent'>$markup</table>";
             } else {
-                $data[] = "no data available";
+                $data[] = __("No data available.");
             }
 
             // add new table row
@@ -148,10 +239,35 @@ class ProcessLoginHistory extends Process {
             $pager .= "</ul>";
         }
 
-        // return admin data table markup and pager
-        return $table->render().$pager;
+        // UI translations
+        $translations = "<div id='translations'>";
+        $translations .= "<span data-term='more'>" . __("more") . "</span>";
+        $translations .= "<span data-term='less'>" . __("less") . "</span>";
+        $translations .= "<span data-term='are_you_sure'>" . __("Are you sure?") . "</span>";
+        $translations .= "<span data-term='remove_failed'>" . __("Sorry, remove failed") . "</span>";
+        $translations .= "</div>";
+
+        // return admin data table markup, pager and translations
+        return $table->render().$pager.$translations;
 
     }    
+
+    /**
+     * Executed when requesting removal of an individual row
+      *
+     * @return boolean
+     */
+    public function ___executeDelete() {
+
+        if ((int) $this->input->get->id != $this->input->get->id) return false;
+
+        $id = (int) $this->input->get->id;
+        $sql = "DELETE FROM " . self::TABLE_NAME . " WHERE id = $id LIMIT 1";
+        $this->db->query($sql);
+
+        return true;
+
+    }
 
     /**
      * Simplified replacement for PHP's native get_browser()
@@ -162,7 +278,6 @@ class ProcessLoginHistory extends Process {
      *
      * @param string $user_agent
      * @return stdClass|null
-     *
      */
     private function get_browser_alt($user_agent = null) {
 
@@ -170,28 +285,28 @@ class ProcessLoginHistory extends Process {
 
         // empty container object for browser info
         $b = new stdClass();
-        $b->browser = 'unknown';
+        $b->browser = __("unknown");
         $b->version = null;
         $b->majorver = 0;
         $b->minorver = 0;
         $b->revision = 0;
-        $b->platform = 'unknown';
-        $b->device = 'desktop';
+        $b->platform = __("unknown");
+        $b->device = __("desktop");
         
         // very rough device type detection
-        if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $b->device = "mobile";
-        else if (preg_match("/iPad|Tablet/i", $user_agent)) $b->device = "tablet";
+        if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $b->device = __("mobile");
+        else if (preg_match("/iPad|Tablet/i", $user_agent)) $b->device = __("tablet");
 
         // identify platform
         if (preg_match("/\(([a-zA-Z0-9\.;:\/\-_ ]+)\)/", $user_agent, $match)) {
-	        if (strstr($match[1], "Windows")) {
-		        $b->platform = "Windows";
-	        } else {
-		        $b->platform = strtok($match[1], ";");
-		        if (strstr($match[1], "Android")) {
-			        $b->platform = (preg_match("/Android[ 0-9\.]*/", $match[1], $match)) ? $match[0] : "Android";
-		        }
-	        }
+            if (strstr($match[1], "Windows")) {
+                $b->platform = "Windows";
+            } else {
+                $b->platform = strtok($match[1], ";");
+                if (strstr($match[1], "Android")) {
+                    $b->platform = (preg_match("/Android[ 0-9\.]*/", $match[1], $match)) ? $match[0] : "Android";
+                }
+            }
         }
 
         // identify version number (mostly for Safari and Opera)
@@ -208,16 +323,16 @@ class ProcessLoginHistory extends Process {
         // identify current browser
         foreach($browsers as $browser) {
             if (preg_match("/([a-z]*?[ ]?$browser)[\/ ]?([0-9.]*)/i", $user_agent, $match)) {
-	            $b->browser = $match[1];
-	            if (!$b->version) $b->version = $match[2];
-	            @list($b->majorver, $b->minorver, $b->revision) = explode('.', $b->version);
+                $b->browser = $match[1];
+                if (!$b->version) $b->version = $match[2];
+                @list($b->majorver, $b->minorver, $b->revision) = explode('.', $b->version);
                 break;
             }
         }
 
         // special case: android browser reports itself as mobile safari
         if (strpos($b->platform, "Android") !== false && $match[1] == "Mobile Safari") {
-	        $b->browser = "Android Browser";
+            $b->browser = "Android Browser";
         }
 
         return $b;

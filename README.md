@@ -34,8 +34,25 @@ initiated it.
 
 ## Settings
 
-This module provides couple of settings you should be aware of. Settings are
-defined via Process Login History Hooks module.
+This module provides couple of settings you should be aware of. Since this
+module actually consists of two modules, one of which handles view side and
+other data collection, both have their own settings:
+
+### Process Login History
+
+**Date Format**
+
+* Defines how dates are formatted on Login History page
+* See the PHP date function reference for information on how to customize
+  this setting: http://www.php.net/manual/en/function.date.php
+* Default: j.n.Y H:i
+
+**Row Limit**
+
+* Defines number of login history rows visible at once on Login History page
+* Default: 25
+
+### Process Login History Hooks
 
 **History Max Age**
 
@@ -48,31 +65,47 @@ defined via Process Login History Hooks module.
 * Defines if attempts to login as nonexisting users should be logged.
 * Default: false
 
-## Todo
+## Roadmap
 
 These are new features, fixes and improvements to current feature set planned
-for later releases (probably not in this order though):
+for later releases:
 
-* manual removal of rows
+**0.9**
+
 * new settings
-  * for date format
+  * date format
   * visible row limit
+* manual removal of rows
 * support for translations
+* more thorough escaping and sanitizing
+* improved error catching for SQL queries
+
+**1.0**
+
 * improved code readability
-* alternative view: JSON output
-* alternative view: group by user
-* proper error catching for SQL queries
-* usage statistics, possibly even graphs
 * complete separation of view logic and main code
 * add latest login info and link to older logins to users profile
+* filter saved results (real/removed/nonexistent users, failed/successful
+  login attempts etc.)
+
+**1.1**
+
+* alternative views
+  * JSON output
+  * group by user
+
+**1.2**
+
 * support for PHP's native get_browser()
 * support for Browser Capabilities PHP Project / phpbrowscap
   (https://github.com/GaretJax/phpbrowscap)
-* filter saved results (real/removed/nonexistent users, failed/successful
-  login attempts etc.)
+
+**1.3**
+
+* usage statistics, possibly even graphs
 
 ## Icons
 
 Icons used by this module are part of Blueberry Basic icon set, which is made
-freely available for any kinds of commercial or non-commercial projects by
+freely available for any kind of commercial or non-commercial projects by
 Icojam. See http://www.icojam.com/blog/?p=259 for more information.

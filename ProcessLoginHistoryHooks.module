@@ -29,10 +29,10 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     public static function getModuleInfo() {
         return array(
             'title' => 'Login History Hooks',
-            'summary' => 'Add hooks required by Login History Process Module',
+            'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 81,
+            'version' => 90,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -120,7 +120,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         if (!$this->history_max_age) return;
 
-        $interval = mysqli_real_escape_string($this->db, $this->history_max_age);
+        $interval = $this->db->escape_string($this->history_max_age),
         $sql = "DELETE FROM " . self::TABLE_NAME . " WHERE login_timestamp < DATE_SUB(NOW(), INTERVAL $interval)";
         $this->db->query($sql);
 
@@ -136,7 +136,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     public function hookLogin(HookEvent $event) {
 
         // default values
-        $user_agent = mysqli_real_escape_string($this->db, $_SERVER['HTTP_USER_AGENT']);
+        $user_agent = $this->db->escape_string($_SERVER['HTTP_USER_AGENT']);
         $user_agent_features = array();
         $login_was_successful = 0;
         $user_id = 0;
@@ -144,7 +144,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         // fetch and filter username from event arguments (using htmlentities() instead of
         // $sanitizer->pageName() to allow keeping track of broken / strange input values)
-        $username = mysqli_real_escape_string($this->db, htmlentities($event->arguments[0]));
+        $username = $this->db->escape_string(htmlentities($event->arguments[0]));
 
         // try to get user matching given username
         if (strtolower($username) == $this->sanitizer->pageName($username)) {
@@ -161,7 +161,6 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         if (isset($_POST['javascript'])) $user_agent_features['javascript'] = 1;
         if (isset($_POST['screen'])) $user_agent_features['screen'] = $_POST['screen'];
         if (isset($_POST['window'])) $user_agent_features['window'] = $_POST['window'];
-        if (isset($_POST['device'])) $user_agent_features['device'] = $_POST['device'];
         if (count($user_agent_features)) {
             foreach ($user_agent_features as &$feature) {
                 $feature = wire()->sanitizer->text(str_replace("'", "", $feature));
