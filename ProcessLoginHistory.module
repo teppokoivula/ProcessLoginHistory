@@ -178,7 +178,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 $data[] = $row['username'] . " <em>(" . __("nonexistent") . ")</em>";
             }
 
-            // timestamp (first row is hidden and only included to allow proper ordering with JavaScript)
+            // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
             $date = ($date_format) ? date($date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
             $data[] = "<span>{$row['login_timestamp']}</span>$date";
 
@@ -190,37 +190,8 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $data[] = "<a href='./delete/?id={$row['id']}' class='remove'>" . __("remove?") . "</a>";
 
             // environment and user agent
-            if ($row['user_agent']) {
-                // init vars
-                $markup = "";
-                $browser = $this->get_browser_alt($row['user_agent']);
-                $features = ($row['user_agent_features']) ? json_decode($row['user_agent_features']) : null;
-                // translation array for certain common words
-                $t = array(
-                    'enabled' => __("Enabled"),
-                    'disabled' => __("Disabled"),
-                    'unidentified' => __("unidentified")
-                );
-                // basic information from user agent string
-                $markup .= "<tr><th>" . __("Browser") . "</th><td>{$browser->browser} {$browser->version}</td></tr>";
-                $markup .= "<tr><th>" . __("Platform") . "</th><td>{$browser->platform}</td></tr>";
-                $markup .= "<tr id='device-type'><th>" . __("Device Type") . "</th><td>{$browser->device}</td></tr>";
-                if ($features) {
-                    // escape values (again just a precaution)
-                    foreach ($features as &$feature) $feature = htmlentities($feature);
-                    // more specific features; these depend on javascript support
-                    $markup .= "<tr><th>JavaScript</th><td>" . ((isset($features->javascript)&&$features->javascript) ? $t['enabled'] : $t['disabled']) . "</td></tr>";
-                    $markup .= "<tr><th>Flash</th><td>" . ((isset($features->flash)&&$features->flash) ? $t['enabled'] : $t['disabled']) . "</td></tr>";
-                    $markup .= "<tr><th>" . __("Screen") . "</th><td>" . ((isset($features->screen)&&$features->screen) ? $features->screen : $t['unidentified']) . "</td></tr>";
-                    $markup .= "<tr><th>" . __("Window") . "</th><td>" . ((isset($features->window)&&$features->window) ? $features->window : $t['unidentified']) . "</td></tr>";
-                } else {
-                    // javascript-dependent feature checking has failed
-                    $markup .= "<tr><th>JavaScript</th><td>{$t['disabled']}</td></tr>";
-                }
-                $data[] = "<table class='user-agent'>$markup</table>";
-            } else {
-                $data[] = __("No data available.");
-            }
+            if ($row['user_agent']) $data[] = $this->renderBrowserInfo($row['user_agent'], $row['user_agent_features']);
+            else $data[] = __("No data available.");
 
             // add new table row
             $table->row($data);
@@ -267,6 +238,71 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $this->db->query($sql);
 
         return true;
+
+    }
+
+    /**
+     * Render human readable view of browser / platform information
+     *
+     * @param string $user_agent
+     * @param string $user_agent_features
+     * @return string
+     */
+    private function renderBrowserInfo($user_agent = null, $user_agent_features = null) {
+
+        // user agent string is required
+        if (!$user_agent) return false;
+
+        // init vars
+        $markup = "";
+        $browser = $this->get_browser_alt($user_agent);
+        $features = ($user_agent_features) ? json_decode($user_agent_features) : null;
+
+        // basic information from user agent string
+        $markup .= "<tr><th>" . __("Browser") . "</th><td>{$browser->browser} {$browser->version}</td></tr>";
+        $markup .= "<tr><th>" . __("Platform") . "</th><td>{$browser->platform}</td></tr>";
+        $markup .= "<tr id='device-type'><th>" . __("Device Type") . "</th><td>{$browser->device}</td></tr>";
+
+        if ($features) {
+
+            // note: since feature detection is implemented with javascript, these will not be available
+            // without proper js support!
+
+            // escape values (just a precaution)
+            foreach ($features as &$feature) $feature = htmlentities($feature);
+
+            // javascript support
+            $markup .= "<tr><th>JavaScript</th><td>";
+            if (isset($features->javascript) && $features->javascript) $markup .= __("Enabled");
+            else $markup .= __("Disabled");
+            $markup .= "</td></tr>";
+
+            // flash support
+            $markup .= "<tr><th>Flash</th><td>";
+            if (isset($features->flash) && $features->flash) $markup .= __("Enabled");
+            else $markup .= __("Disabled");
+            $markup .= "</td></tr>";
+
+            // screen size
+            $markup .= "<tr><th>" . __("Screen") . "</th><td>";
+            if (isset($features->screen) && $features->screen) $markup .= $features->screen;
+            else $markup .= __("unidentified");
+            $markup .= "</td></tr>";
+
+            // window size
+            $markup .= "<tr><th>" . __("Window") . "</th><td>";
+            if (isset($features->window) && $features->window) $markup .= $features->window;
+            else $markup .= __("unidentified");
+            $markup .= "</td></tr>";
+
+        } else {
+
+            // javascript-dependent feature checking has failed
+            $markup .= "<tr><th>JavaScript</th><td>" . __("Disabled") . "</td></tr>";
+
+        }
+        
+        return "<table class='user-agent'>$markup</table>";
 
     }
 
