@@ -140,6 +140,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 __('User'),
                 __('When'),
                 __('Successful attempt?'),
+                '', // placeholder
                 __('More')
             ));
 
@@ -186,7 +187,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             else $data[] = "<em>" . __("No") . "</em>";
 
             // link for removing individual history row
-            $remove_markup = "<a href='./delete/?id={$row['id']}' class='remove'>" . __("remove?") . "</a>";
+            $data[] = "<a href='./delete/?id={$row['id']}' class='remove'>" . __("remove?") . "</a>";
 
             // environment and user agent
             if ($row['user_agent']) {
@@ -216,7 +217,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                     // javascript-dependent feature checking has failed
                     $markup .= "<tr><th>JavaScript</th><td>{$t['disabled']}</td></tr>";
                 }
-                $data[] = "$remove_markup<table class='user-agent'>$markup</table>";
+                $data[] = "<table class='user-agent'>$markup</table>";
             } else {
                 $data[] = __("No data available.");
             }

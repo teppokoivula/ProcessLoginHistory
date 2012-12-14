@@ -61,11 +61,19 @@ table.login-history tr.more table th:hover {
     cursor: auto;
 }
 
-table.login-history tr.more a.remove {
-    position: absolute;
-    text-shadow: none;
-    margin-top: -36px;
-    right: 16%;
+table.login-history a.remove {
+    visibility: hidden;
+}
+
+table.login-history tr:hover a.remove {
+    visibility: visible;
+    opacity: 0.33;
+}
+
+table.login-history tr.open a.remove,
+table.login-history tr a.remove:hover {
+    visibility: visible;
+    opacity: 1;
 }
 
 table.login-history span {
