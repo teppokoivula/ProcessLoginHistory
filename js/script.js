@@ -50,4 +50,26 @@ $(document).ready(function() {
     $('table.login-history th.header').click(function() {
         $('table.login-history tr.open a.toggle-more').click();
     });
+    // when data is filtered by id and only one row exists, show info by default
+    var getp = window.location.search.replace("?", "");
+    if (getp.substr(0,3) == "id=" && $('a.toggle-more').length == 1) {
+        $('a.toggle-more').click();
+    }
+    // filter form autosubmit
+    $('form#filters select').change(function() {
+        this.form.submit();
+    });
+    // hide nonrelevant options in filter form
+    if (
+        $('form#filters select[name=username] option[selected]').attr('value') ||
+        $('form#filters select[name=login_was_successful] option[selected]').attr('value') == 1
+    ) {
+        $('form#filters select[name=user_id]')
+            .find('option:first')
+                .attr('selected', 'selected')
+                .end()
+            .addClass('disabled')
+            .attr('title', $('form#filters select[name=user_id]').attr('data-disabled-title'))
+            .attr('disabled', 'disabled');
+    }
 });

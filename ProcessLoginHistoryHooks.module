@@ -32,7 +32,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 91,
+            'version' => 99,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -109,6 +109,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         // hook after ProcessController::execute to include a JavaScript file (admin only)
         $this->addHookAfter('ProcessController::execute', $this, 'hookExecute');
+
+        // hook after ProcessPageEdit::execute to add latest login row to user profile (admin only)
+        $this->addHookAfter('ProcessPageEdit::execute', $this, 'hookProcessPageEditExecute');
 
     }
 
@@ -201,6 +204,89 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     public function hookExecute(HookEvent $event) {
         if ($this->page->process !== "ProcessLoginHistory") return;
         $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/script.js"); 
+    }
+
+    /**
+     * Function executed after Execute method of Process Page Edit
+     *
+     * The purpose of this is to add simplified version of login history
+     * and links to full data of that particular user to user edit view.
+     *
+     * @param HookEvent $event
+     */
+    public function hookProcessPageEditExecute(HookEvent $event) {
+
+        // this only applies to user edit view (admin)
+        if ($event->object->page->process != "ProcessUser") return;
+
+        // make sure that current user has view permission to login history page
+        $login_history_id = $this->modules->getModuleID("ProcessLoginHistory");
+        $login_history_page = $this->pages->get("template=admin, process=$login_history_id");
+        if (!$this->user->hasPermission('view', $login_history_page)) return;
+        
+        // get (and validate) user object based on get param "id"
+        $user = $this->users->get((int) $this->input->get->id);
+        if (!$user->id) return;
+        
+        // get latest login attempts (return if no rows are found)
+        $sql = "SELECT id, login_timestamp, login_was_successful 
+                FROM " . self::TABLE_NAME . " 
+                WHERE user_id = {$user->id} 
+                ORDER BY login_timestamp DESC
+                LIMIT 3";
+        $result = $this->db->query($sql);
+        if (!$result->num_rows) return;
+
+        // get config data from main module (for uniform date formatting)
+        $config = $this->wire->modules->getModuleConfigData("ProcessLoginHistory");
+
+        $markup = "";
+        while ($row = $result->fetch_assoc()) {
+            
+            $login_date = date($config['date_format'], strtotime($row['login_timestamp']));
+            
+            // make sure that currently used PHP version has DateTime implemented
+            if (version_compare(PHP_VERSION, '5.3.0') >= 0) {
+                $date_diff = date_diff(date_create(), date_create($login_date));
+                if ($date_diff->format('%a') < 1) {
+                    // less than a day since this login attempt
+                    $date_diff = $date_diff->format('%h');
+                    if ($date_diff < 1) $date_diff = __("less than an hour ago");
+                    else $date_diff = sprintf(_n("one hour ago", "%d hours ago", $date_diff), $date_diff);
+                } else {
+                    // one or more days since this login attempt
+                    $date_diff = $date_diff->format('%a');
+                    $date_diff = sprintf(_n("one day ago", "%d days ago", $date_diff), $date_diff);
+                }
+                $date_diff = ", " . $date_diff;
+            } else {
+                // calculating date differences tends to get messy and there's no
+                // real need to offer alternative solution for older PHP versions
+                $date_diff = "";
+            }
+            
+            // was login attempt succesful?
+            $status = __("unsuccessful attempt");
+            if ($row['login_was_successful']) $status = __("successful attempt");
+
+            // markup for this particular login history row
+            $more = "<a href='{$login_history_page->url}?id={$row['id']}'>" . __("more") . " &raquo;</a>";
+            $markup .= "<li>$login_date <em>($status$date_diff)</em> $more</li>";
+            
+        }
+        
+        // put together final markup for login history
+        $login_info = "<div class='user-login-history'>"
+                    . "<ul>$markup</ul>"
+                    . "<p><a href='{$login_history_page->url}?username={$user->name}'>"
+                    . __("View entire login history for this user")
+                    . " &raquo;</a></p>"
+                    . "</div>";
+        
+        // load main modules styles and prepend created login history markup to event return value
+        $this->config->styles->add($this->config->urls->ProcessLoginHistory."ProcessLoginHistory.css"); 
+        $event->return = $login_info . $event->return;
+        
     }
 
 }
