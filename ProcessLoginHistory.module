@@ -321,7 +321,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $where = ($status == "1" || $status == "0") ? " WHERE login_was_successful = $status" : "";
         $sql = "SELECT DISTINCT username FROM " . self::TABLE_NAME . "$where ORDER BY username DESC";
         $result = $this->db->query($sql);
-        $usernames = ($result->num_rows > 1) ? "<option value=''>" . __("by any user") . "</option>" : "";
+        $usernames = (!$result->num_rows || $result->num_rows > 1) ? "<option value=''>" . __("by any user") . "</option>" : "";
         while($row = $result->fetch_assoc()) {
             $selected = ($username == $row['username']) ? " selected='selected'" : "";
             $usernames .= "<option value='{$row['username']}'$selected>" . sprintf(__("by %s"), $row['username']) . "</option>"; // by %s // %s will be replaced run-time by username
