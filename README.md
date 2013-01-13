@@ -70,24 +70,6 @@ other data collection, both have their own settings:
 These are new features, fixes and improvements to current feature set planned
 for later releases:
 
-**0.9**
-
-* new settings
-  * date format
-  * visible row limit
-* manual removal of rows
-* support for translations
-* more thorough escaping and sanitizing
-* improved error catching for SQL queries
-
-**1.0**
-
-* improved code readability
-* complete separation of view logic and main code
-* add latest login info and link to older logins to users profile
-* filter saved results (real/removed/nonexistent users, failed/successful
-  login attempts etc.)
-
 **1.1**
 
 * alternative views
