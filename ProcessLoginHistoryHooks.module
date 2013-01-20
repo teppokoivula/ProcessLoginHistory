@@ -32,7 +32,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 100,
+            'version' => 101,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -67,11 +67,11 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         if (isset($data['log_nonexistent_users'])) $field->checked = "checked";
         $fields->add($field);
 
-        // for how long should login history be retained?
+        // for how long should history be retained?
         $field = $modules->get("InputfieldSelect");
         $field->name = "history_max_age";
         $field->label = "History max age";
-        $field->description = "How long should we retain login history?";
+        $field->description = "How long should we retain history?";
         if ($modules->isInstalled("LazyCron")) {
             $field->addOption('1 WEEK', '1 week');
             $field->addOption('2 WEEK', '2 weeks');
@@ -93,12 +93,12 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     /**
      * Initialization function
      *
-     * This function attachs hooks required by Process Login History.
+     * This function attachs required hooks.
      *
      */
     public function init() {
 
-        // remove expired login history rows daily
+        // remove expired history rows daily
         $this->addHook("LazyCron::everyDay", $this, 'cleanup');
 
         // hook after login to save login info into db 
@@ -110,7 +110,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         // hook after ProcessController::execute to include a JavaScript file (admin only)
         $this->addHookAfter('ProcessController::execute', $this, 'hookExecute');
 
-        // hook after ProcessPageEdit::execute to add latest login row to user profile (admin only)
+        // hook after ProcessPageEdit::execute to add latest login rows to user profile (admin only)
         $this->addHookAfter('ProcessPageEdit::execute', $this, 'hookProcessPageEditExecute');
 
     }
@@ -190,7 +190,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * @param HookEvent $event
      */
     public function hookBuildLoginForm(HookEvent $event) {
-        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/login.js"); 
+        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/login.js?v=101");
     }
 
     /**
@@ -203,7 +203,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      */
     public function hookExecute(HookEvent $event) {
         if ($this->page->process !== "ProcessLoginHistory") return;
-        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/script.js"); 
+        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/script.js?v=".$this->version); 
     }
 
     /**
@@ -269,13 +269,13 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             $status = __("unsuccessful attempt");
             if ($row['login_was_successful']) $status = __("successful attempt");
 
-            // markup for this particular login history row
+            // markup for this particular history row
             $more = "<a href='{$login_history_page->url}?id={$row['id']}'>" . __("more") . " &raquo;</a>";
             $markup .= "<li>$login_date <em>($status$date_diff)</em> $more</li>";
             
         }
         
-        // put together final markup for login history
+        // put together final markup
         $login_info = "<div class='user-login-history'>"
                     . "<ul>$markup</ul>"
                     . "<p><a href='{$login_history_page->url}?username={$user->name}'>"
@@ -283,8 +283,8 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
                     . " &raquo;</a></p>"
                     . "</div>";
         
-        // load main modules styles and prepend created login history markup to event return value
-        $this->config->styles->add($this->config->urls->ProcessLoginHistory."ProcessLoginHistory.css"); 
+        // load main modules styles and prepend created markup to event return value
+        $this->config->styles->add($this->config->urls->ProcessLoginHistory."ProcessLoginHistory.css?v=101"); 
         $event->return = $login_info . $event->return;
         
     }

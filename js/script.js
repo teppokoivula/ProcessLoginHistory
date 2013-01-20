@@ -2,7 +2,7 @@ $(document).ready(function() {
     // more/less links
     var more = $('span[data-term=more]').text();
     var less = $('span[data-term=less]').text();
-    $('table.login-history tr').each(function() {
+    $('table.history tr').each(function() {
         $(this)
             .find('td:eq(4)')
                 .addClass('user-agent')
@@ -11,8 +11,8 @@ $(document).ready(function() {
                     .after('<a href="#" class="toggle-more">'+more+' <b>&or;</b></a>');
     });
     // more/less functionality
-    $('table.login-history th:eq(4)').css('width', '100px');
-    $('table.login-history td.user-agent a').toggle(function() {
+    $('table.history th:eq(4)').css('width', '100px');
+    $('table.history td.user-agent a').toggle(function() {
         $(this)
             .html(less + ' <b>&and;</b>')
             .parents('tr:first')
@@ -31,7 +31,7 @@ $(document).ready(function() {
     // remove link
     var are_you_sure = $('span[data-term=are_you_sure]').text();
     var remove_failed = $('span[data-term=remove_failed]').text();
-    $('table.login-history a.remove').live('click', function() {
+    $('table.history a.remove').live('click', function() {
         if (confirm(are_you_sure)) {
             var $link = $(this);
             $.get($(this).attr('href'), function(data) {
@@ -47,8 +47,8 @@ $(document).ready(function() {
         return false;
     });
     // hide extra info when ordering data
-    $('table.login-history th.header').click(function() {
-        $('table.login-history tr.open a.toggle-more').click();
+    $('table.history th.header').click(function() {
+        $('table.history tr.open a.toggle-more').click();
     });
     // when data is filtered by id and only one row exists, show info by default
     var getp = window.location.search.replace("?", "");
