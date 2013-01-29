@@ -108,6 +108,7 @@ div.user-login-history {
     position: relative;
     border-radius: 5px;
     background: #e9eff1;
+    margin-bottom: 1em;
     border: 1px solid #dbe3e5;
     padding: 1.2em 1em 1.4em 1em;
 }
