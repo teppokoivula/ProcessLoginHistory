@@ -32,7 +32,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 101,
+            'version' => 102,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -190,7 +190,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * @param HookEvent $event
      */
     public function hookBuildLoginForm(HookEvent $event) {
-        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/login.js?v=101");
+        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/login.js?v=102");
     }
 
     /**
@@ -203,7 +203,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      */
     public function hookExecute(HookEvent $event) {
         if ($this->page->process !== "ProcessLoginHistory") return;
-        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/script.js?v=".$this->version); 
+        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/script.js?v=102"); 
     }
 
     /**
@@ -238,12 +238,18 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         if (!$result->num_rows) return;
 
         // get config data from main module (for uniform date formatting)
-        $config = $this->wire->modules->getModuleConfigData("ProcessLoginHistory");
-
+        $config = $this->modules->getModuleConfigData("ProcessLoginHistory");
+        if (isset($config['date_format'])) {
+            $date_format = $config['date_format'];
+        } else {
+            $defaults = $this->modules->get("ProcessLoginHistory")->getDefaultData();
+            $date_format = $defaults['date_format'];
+        }
+        
         $markup = "";
         while ($row = $result->fetch_assoc()) {
             
-            $login_date = date($config['date_format'], strtotime($row['login_timestamp']));
+            $login_date = date($date_format, strtotime($row['login_timestamp']));
             
             // make sure that currently used PHP version has DateTime implemented
             if (version_compare(PHP_VERSION, '5.3.0') >= 0) {
@@ -284,7 +290,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
                     . "</div>";
         
         // load main modules styles and prepend created markup to event return value
-        $this->config->styles->add($this->config->urls->ProcessLoginHistory."ProcessLoginHistory.css?v=101"); 
+        $this->config->styles->add($this->config->urls->ProcessLoginHistory."ProcessLoginHistory.css?v=102");
         $event->return = $login_info . $event->return;
         
     }
