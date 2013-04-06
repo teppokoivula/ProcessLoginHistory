@@ -32,7 +32,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 102,
+            'version' => 103,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -106,9 +106,6 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         // hook after ProcessLogin::buildLoginForm to add useful extra fields
         $this->addHookAfter('ProcessLogin::buildLoginForm', $this, 'hookBuildLoginForm');
-
-        // hook after ProcessController::execute to include a JavaScript file (admin only)
-        $this->addHookAfter('ProcessController::execute', $this, 'hookExecute');
 
         // hook after ProcessPageEdit::execute to add latest login rows to user profile (admin only)
         $this->addHookAfter('ProcessPageEdit::execute', $this, 'hookProcessPageEditExecute');
@@ -191,19 +188,6 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      */
     public function hookBuildLoginForm(HookEvent $event) {
         $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/login.js?v=102");
-    }
-
-    /**
-     * This function is executed before page markup has been created
-     *
-     * Used for injecting custom JavaScript file to admin page. This file
-     * contains mostly UI level additions.
-     *
-     * @param HookEvent $event
-     */
-    public function hookExecute(HookEvent $event) {
-        if ($this->page->process !== "ProcessLoginHistory") return;
-        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/script.js?v=102"); 
     }
 
     /**
