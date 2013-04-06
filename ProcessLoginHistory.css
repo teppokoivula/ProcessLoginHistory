@@ -19,6 +19,7 @@ form#filters select.disabled {
     opacity: 0.5;
 }
 
+ul.MarkupPagerNavCustom li.MarkupPagerNavSeparator,
 ul.MarkupPagerNavCustom li a {
     margin-right: 3px;
 }
