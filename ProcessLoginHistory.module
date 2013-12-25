@@ -20,7 +20,6 @@
  * http://processwire.com
  *
  */
- 
 class ProcessLoginHistory extends Process implements ConfigurableModule {
     
     /**

@@ -18,7 +18,6 @@
  * http://processwire.com
  *
  */
- 
 class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableModule {
 
     /**
