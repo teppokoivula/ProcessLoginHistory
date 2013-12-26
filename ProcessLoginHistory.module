@@ -29,11 +29,11 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      */
     public static function getModuleInfo() {
         return array(
-            'title' => 'Login History',
-            'summary' => 'Keep track of site login history',
+            'title' => __('Login History'),
+            'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 103,
+            'version' => 104,
             'singular' => true,
             'autoload' => false,
             'installs' => 'ProcessLoginHistoryHooks'
