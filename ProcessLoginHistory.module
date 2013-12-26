@@ -368,45 +368,80 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      */
     private function renderFilters() {
 
-        $markup = "<form id='filters'>";
+        $markup = "";
 
         // Was login attempt successful?
-        $status = $this->input->get->login_was_successful;
-        $markup .= "<select name='login_was_successful'>";
-        $markup .= "<option value=''>" . __("All login attempts") . "</option>";
-        $selected = ($status == "1") ? " selected='selected'" : "";
-        $markup .= "<option value='1'$selected>" . __("Successful login attempts") . "</option>";
-        $selected = ($status == "0") ? " selected='selected'" : "";
-        $markup .= "<option value='0'$selected>" . __("Unsuccessful login attempts") . "</option>";
-        $markup .= "</select>";
+        $options = array(
+            __("All login attempts"),
+            __("Successful login attempts") => "1",
+            __("Unsuccessful login attempts") => "0",
+        );
+        $markup .= $this->renderSelect('login_was_succesful', $options);
 
         // Username
-        $username = $this->input->get->username;
-        $where = ($status == "1" || $status == "0") ? " WHERE login_was_successful = $status" : "";
-        $sql = "SELECT DISTINCT username FROM {$this->table_name}$where ORDER BY username DESC";
+        $options = array();
+        $login = $this->input->get->login_was_successful;
+        $where = ($login == "1" || $login == "0") ? " WHERE login_was_successful = $login" : "";
+        $sql = "SELECT DISTINCT username 
+                FROM {$this->table_name}
+                $where 
+                ORDER BY username DESC";
         $result = $this->db->query($sql);
-        $usernames = (!$result->num_rows || $result->num_rows > 1) ? "<option value=''>" . __("by any user") . "</option>" : "";
-        while($row = $result->fetch_assoc()) {
-            $selected = ($username == $row['username']) ? " selected='selected'" : "";
-            $usernames .= "<option value='{$row['username']}'$selected>" . sprintf(__("by %s"), $row['username']) . "</option>"; // by %s // %s will be replaced run-time by username
+        if (!$result->num_rows || $result->num_rows > 1) {
+            $options[] = __("by any user");
         }
-        $markup .= "<select name='username'>$usernames</select>";
+        while ($row = $result->fetch_assoc()) {
+            $key = sprintf(__("by %s"), $row['username']); // by %s // %s will be replaced run-time by username
+            $options[$key] = $row['username'];
+        }
+        $markup .= $this->renderSelect('username', $options);
 
         // Real/removed/nonexistent users
-        $user_id = $this->input->get->user_id;
-        $disabled_title = __("Not relevant in this context");
-        $markup .= "<select name='user_id' data-disabled-title='$disabled_title'>";
-        $markup .= "<option value=''>" . __("whether or not user really exists") . "</option>";
-        $selected = ($user_id == "!0") ? " selected='selected'" : "";        
-        $markup .= "<option value='!0'$selected>" . __("limited to existing users") . "</option>";
-        $selected = ($user_id == "0") ? " selected='selected'" : "";        
-        $markup .= "<option value='0'$selected>" . __("limited to nonexisting users") . "</option>";
-        $markup .= "</select>";
+        $options = array(
+            __("whether or not user really exists"),
+            __("limited to existing users") => "!0",
+            __("limited to nonexisting users") => "0",
+        );
+        $attrs = array('data-disabled-title' => __("Not relevant in this context"));
+        $markup .= $this->renderSelect('user_id', $options, array('attrs' => $attrs));
         
-        $markup .= "</form>";
+        if ($markup) return "<form id='filters'>$markup</form>";
+        
+    }
 
-        return $markup;
-        
+    /**
+     * Render markup for select element
+     *
+     * @param string $name
+     * @param array $options
+     * @param array $settings
+     * @return string
+     */
+    private function renderSelect($name, array $options, array $settings = array()) {
+
+        if (!$name) return;
+
+        $disabled = "";
+        if (count($options) < 2) {
+            $disabled = " disabled='disabled' class='disabled'";
+        }
+
+        $attrs = "";
+        if (isset($settings['attrs'])) {
+            foreach ($settings['attrs'] as $k => $v) $attrs .= " $k='$v'";
+        }
+
+        $markup = "";
+        foreach ($options as $key => $option) {
+            $value = $key ? $option : '';
+            $text = !is_numeric($key) ? $key : $option;
+            if (isset($settings['translate'])) $text = __($text);
+            $selected = ($this->input->get->$name == $value) ? ' selected="selected"' : '';
+            $markup .= "<option$selected value='$value'>$text</option>";
+        }
+
+        return "<select name='$name'$disabled$attrs>$markup</select>";
+
     }
 
     /**
