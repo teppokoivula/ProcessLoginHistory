@@ -55,7 +55,7 @@ $(document).ready(function() {
         $('a.toggle-more').click();
     }
     // filter form autosubmit
-    $('form#filters select').change(function() {
+    $('form#filters select, form#filters input').change(function() {
         this.form.submit();
     });
     // hide nonrelevant options in filter form
@@ -71,4 +71,20 @@ $(document).ready(function() {
             .attr('title', $('form#filters select[name=user_id]').attr('data-disabled-title'))
             .attr('disabled', 'disabled');
     }
+    var $when = $('form#filters select[name=when]');
+    if ($when.length && $when.attr('value') != "between") {
+        $('form#filters .loginhistory-datepicker')
+            .addClass('disabled')
+            .attr('title', $('form#filters input[name=date_from]').attr('data-disabled-title'))
+            .attr('disabled', 'disabled');
+    }
+    // datepicker
+    $('.loginhistory-datepicker').each(function() {
+        var options = {
+            dateFormat: $(this).attr('data-dateformat'),
+            minDate: $(this).attr('data-mindate'),
+            maxDate: $(this).attr('data-maxdate')
+        };
+        $(this).datepicker(options);
+    });
 });

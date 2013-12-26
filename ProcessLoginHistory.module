@@ -33,7 +33,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 105,
+            'version' => 106,
             'singular' => true,
             'autoload' => false,
             'installs' => 'ProcessLoginHistoryHooks'
@@ -161,7 +161,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             ));
 
         // apply filters
-        $filters = array();
+        $where = array();
         $allowed_keys = array(
             "id",
             "user_id",
@@ -169,32 +169,48 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             "user_agent",
             "user_agent_features",
             "login_was_successful",
-            "login_timestamp"
+            "when",
+            "date_from",
+            "date_until",
         );
         foreach ($this->input->get as $key => $value) {
             if (in_array($key, $allowed_keys) && $value != "") {
+                $operator = "=";
                 $value = $this->db->real_escape_string($value);
-                if (strpos($key, "user_agent") === 0) {
-                    $filters[] = "$key LIKE '%$value%'";
-                } else {
-                    if (strpos($value, "!") === 0) {
-                        $value = substr($value, 1);
-                        $operator = "!=";
-                    } else {
-                        $operator = "=";
-                    }
-                    $filters[] = "$key $operator '$value'";
+                if (strpos($value, "!") === 0) {
+                    $operator = "!=";
+                    $value = substr($value, 1);
+                }
+                switch ($key) {
+                    case "user_agent":
+                        $where[] = "$key LIKE '%$value%'";
+                        break;
+                    case "when":
+                        if (!isset($where['date_from']) && !isset($where['date_until']) && in_array($value, $allowed_intervals)) {
+                            $where[$key] = "DATE_SUB(CURDATE(), INTERVAL $value) <= timestamp";
+                        }
+                        break;
+                    case "date_from":
+                    case "date_until":
+                        if (!isset($where['when'])) {
+                            $value = date("Y-m-d", strtotime($value));
+                            $operator = "<=";
+                            $time = "23:59";
+                            if ($key == "date_from") {
+                                $operator = ">=";
+                                $time = "00:00";
+                            }
+                            $where[$key] = "login_timestamp $operator '$value $time'";
+                        }
+                        break;
+                    default:
+                        $where[] = "$key $operator '$value'";
                 }
             }
         }
 
-        // if filters exist, put together where clause
-        $where = "";
-        if (count($filters)) {
-            $where = " WHERE";
-            foreach ($filters as $filter) $where .= " $filter AND";
-            $where = substr($where, 0, strlen($where)-4);
-        }
+        // put together WHERE clause
+        $where = $where ? "WHERE " . implode(" AND ", $where) : "";
 
         // variables required by pager
         $start = 0;
@@ -405,6 +421,41 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $attrs = array('data-disabled-title' => __("Not relevant in this context"));
         $markup .= $this->renderSelect('user_id', $options, array('attrs' => $attrs));
         
+        // When
+        $options = array(
+            __("whenever"),
+            __("within a day") => '1 DAY',
+            __("within a week") => '1 WEEK',
+            __("within a month") => '1 MONTH',
+            __("within a year") => '1 YEAR',
+            __("between") => "between",
+        );
+        $markup .= $this->renderSelect('when', $options);
+            
+        // Date range
+        $disabled_title = __("Not relevant in this context");
+        $date_from = ($this->input->get->date_from) ? date('d.m.Y', strtotime($this->input->get->date_from)) : '';
+        $date_until = ($this->input->get->date_until) ? date('d.m.Y', strtotime($this->input->get->date_until)) : '';
+        $input = $this->modules->get("InputfieldText");
+        $markup .= "<input type='text'"
+                 . " value='$date_from'"
+                 . " size='10'"
+                 . " data-maxdate='+0D'"
+                 . " data-dateformat='dd.mm.yy'"
+                 . " name='date_from'"
+                 . " data-disabled-title='$disabled_title'"
+                 . " class='loginhistory-datepicker'"
+                 . " />"
+                 . " .. "
+                 . "<input type='text'"
+                 . " value='$date_until'"
+                 . " size='10'"
+                 . " data-maxdate='+0D'"
+                 . " data-dateformat='dd.mm.yy'"
+                 . " name='date_until'"
+                 . " class='loginhistory-datepicker'"
+                 . " />";
+
         if ($markup) return "<form id='filters'>$markup</form>";
         
     }
