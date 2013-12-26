@@ -118,7 +118,12 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $field->label = "Row Limit";
         $field->description = "Number of history rows visible at once";
         $field->required = true;
-        $field->addOptions(array(25 => '25', 50 => '50', 75 => '75', 100 => '100'));
+        $field->addOptions(array(
+            25 => '25', 
+            50 => '50', 
+            75 => '75', 
+            100 => '100',
+        ));
         $field->value = $data['row_limit'];
         $fields->add($field);
 
@@ -131,6 +136,9 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      */
     public function init() {
         parent::init();
+        // should date formatting occur?
+        $defaults = self::getDefaultData();
+        if ($this->date_format == $defaults['date_format']) unset($this->date_format);
     }
 
     /**
@@ -151,10 +159,6 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 '', // placeholder
                 __('More')
             ));
-
-        // should date formatting occur?
-        $defaults = self::getDefaultData();
-        $date_format = ($this->date_format != $defaults['date_format']) ? $this->date_format : null;
 
         // apply filters
         $filters = array();
@@ -235,7 +239,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             }
 
             // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
-            $date = ($date_format) ? date($date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
+            $date = ($this->date_format) ? date($this->date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
             $data[] = "<span>{$row['login_timestamp']}</span>$date";
 
             // status of login attempt
