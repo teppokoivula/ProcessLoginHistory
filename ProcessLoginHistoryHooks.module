@@ -31,7 +31,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 106,
+            'version' => 107,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -189,7 +189,8 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * @param HookEvent $event
      */
     public function hookBuildLoginForm(HookEvent $event) {
-        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/login.js?v=102");
+        $info = self::getModuleInfo();
+        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/login.js?v={$info['version']}");
     }
 
     /**
