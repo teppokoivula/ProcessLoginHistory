@@ -31,7 +31,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 107,
+            'version' => 108,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -115,10 +115,11 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     /**
      * Delete data older than given interval
      *
-     * @param string $interval Interval, defaults to history_max_age setting
+     * @param string|HookEvent $interval Interval, defaults to history_max_age setting
      */
     public function cleanup($interval = null) {
 
+        if ($interval instanceof HookEvent) $interval = $this->history_max_age;
         if (is_null($interval) && is_null($this->history_max_age)) return;
         else if (is_null($interval)) $interval = $this->history_max_age;
 
