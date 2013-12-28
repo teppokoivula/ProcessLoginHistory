@@ -74,7 +74,6 @@ for later releases:
 
 * alternative views
   * JSON output
-  * group by user
 
 **1.2**
 
