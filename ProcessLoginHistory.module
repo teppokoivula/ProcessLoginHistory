@@ -32,7 +32,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 107,
+            'version' => 110,
             'singular' => true,
             'autoload' => false,
             'installs' => 'ProcessLoginHistoryHooks'
@@ -151,12 +151,12 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $table->setEncodeEntities(false);
         $table->setClass('history');
         $table->headerRow(array(
-                __('User'),
-                __('When'),
-                __('Successful attempt?'),
-                '', // placeholder
-                __('More')
-            ));
+            __('User'),
+            __('When'),
+            __('Successful attempt?'),
+            '', // placeholder
+            __('More')
+        ));
 
         // fetch rows from database and add them to our data table
         $query = $this->buildQuery();
@@ -191,9 +191,27 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $info .= "</p></div>";
 
         // return admin data table markup, pager and translations
-        return $this->renderFilters().$info.$table->render().$pager.$translations;
+        return $filters . $info . $table->render() . $pager . $translations;
 
     }    
+
+    /**
+     * Executed when a page with this Process assigned is accessed with /JSON/
+     *
+     */
+    public function ___executeJSON() {
+
+        // fetch rows from database
+        $data = array();
+        $query = $this->buildQuery();
+        $result = $this->db->query($query['query']);
+        while ($row = $result->fetch_assoc()) $data[] = $row;
+
+        // send header and output JSON
+        header('Content-type: application/json');
+        exit(json_encode($data));
+
+    }
 
     /**
      * Build SQL query for fetching changelog data from custom database table
