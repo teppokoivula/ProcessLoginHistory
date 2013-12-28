@@ -18,7 +18,6 @@
  * Licensed under GNU/GPL v2, see LICENSE.TXT
  * 
  * http://processwire.com
- *
  */
 class ProcessLoginHistory extends Process implements ConfigurableModule {
     
@@ -33,7 +32,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 106,
+            'version' => 107,
             'singular' => true,
             'autoload' => false,
             'installs' => 'ProcessLoginHistoryHooks'
@@ -57,13 +56,11 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
     
     /**
      * Names of admin page and database table used by this module
-     *
      */
     const PAGE_NAME = 'login-history';
 
     /**
      * Name of database table used by this module
-     *
      */
     protected $table_name;
 
@@ -73,7 +70,6 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * ProcessWire will automatically overwrite it with anything the user has specifically configured.
      * This is done in construct() rather than init() because ProcessWire populates config data after
      * construct(), but before init().
-     *
      */
     public function __construct() {
         // Get name of database table from ProcessLoginHistoryHooks
@@ -132,7 +128,6 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
     /**
      * Initialization function called before any execute functions
-     *
      */
     public function init() {
         parent::init();
@@ -143,10 +138,13 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
     /**
      * Executed when a page with this Process assigned is accessed
-      *
+     *
      * @return string
      */
     public function ___execute() {
+
+        // render filters
+        $filters = $this->renderFilters();
         
         // setup admin data table for history
         $table = $this->modules->get("MarkupAdminDataTable");
@@ -160,8 +158,59 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 __('More')
             ));
 
-        // apply filters
+        // fetch rows from database and add them to our data table
+        $query = $this->buildQuery();
+        $result = $this->db->query($query['query']);
+        while ($row = $result->fetch_assoc()) {
+            $table->row($this->parseTableRow($row));
+        }
+
+        // if less than two matches were found, disable table sorting
+        if ($query['total'] < 2) $table->setSortable(false);
+
+        // pager markup
+        $pager = "";
+        if ($query['limit'] && $query['total'] > $query['limit']) {
+            $pager_links = 20;
+            $pager_page = (int) $query['start']/$query['limit']+1;
+            $pager_pages = ceil($query['total']/$query['limit']);
+            $pager = $this->renderPager($pager_links, $pager_page, $pager_pages);
+        }
+
+        // UI translations
+        $translations = "<div id='translations'>";
+        $translations .= "<span data-term='more'>" . __("more") . "</span>";
+        $translations .= "<span data-term='less'>" . __("less") . "</span>";
+        $translations .= "<span data-term='are_you_sure'>" . __("Are you sure?") . "</span>";
+        $translations .= "<span data-term='remove_failed'>" . __("Sorry, remove failed") . "</span>";
+        $translations .= "</div>";
+
+        // Basic information about found rows
+        $info = "<div id='info'><p>";
+        $info .= sprintf(_n("One matching row found.", "%d matching rows found.", $query['total']), $query['total']);
+        $info .= "</p></div>";
+
+        // return admin data table markup, pager and translations
+        return $this->renderFilters().$info.$table->render().$pager.$translations;
+
+    }    
+
+    /**
+     * Build SQL query for fetching changelog data from custom database table
+     *
+     * @return array Array with SQL query ('query'), total row count ('total'),
+     *         start ('start') and limit ('limit')
+     */
+    private function buildQuery() {
+
+        // $joins and $where arrays are used to construct where clause and joins
+        // later. $where contains rules like "key = '$value'" and $joins actual
+        // joins, such as "LEFT JOIN table ON table.id = $id".
+        $joins = array();
         $where = array();
+
+        // Allowed keys (GET params used to build queries) are defined here to
+        // make sure we're not letting any weird queries get past us.
         $allowed_keys = array(
             "id",
             "user_id",
@@ -173,6 +222,17 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             "date_from",
             "date_until",
         );
+
+        // Possible values for 'when' filter
+        $allowed_intervals = array(
+            __("whenever"),
+            __("within a day") => '1 DAY',
+            __("within a week") => '1 WEEK',
+            __("within a month") => '1 MONTH',
+            __("within a year") => '1 YEAR',
+            __("between") => "between",
+        );
+
         foreach ($this->input->get as $key => $value) {
             if (in_array($key, $allowed_keys) && $value != "") {
                 $operator = "=";
@@ -187,7 +247,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                         break;
                     case "when":
                         if (!isset($where['date_from']) && !isset($where['date_until']) && in_array($value, $allowed_intervals)) {
-                            $where[$key] = "DATE_SUB(CURDATE(), INTERVAL $value) <= timestamp";
+                            $where[$key] = "DATE_SUB(CURDATE(), INTERVAL $value) <= login_timestamp";
                         }
                         break;
                     case "date_from":
@@ -209,97 +269,42 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             }
         }
 
-        // put together WHERE clause
+        // put together WHERE clause and required JOINs
         $where = $where ? "WHERE " . implode(" AND ", $where) : "";
+        $joins = $joins ? " " . implode(" ", $joins) : "";
 
-        // variables required by pager
-        $start = 0;
-        $limit = $this->row_limit;
-        $sql = "SELECT count(*) FROM {$this->table_name} $where";
+        // total count of rows in database table
+        $sql = "SELECT COUNT(*) FROM {$this->table_name} $where";
         $row = $this->db->query($sql)->fetch_row();
         $total = reset($row);
-        if ($total > $limit) {
-            $start = ($this->input->get->page) ? (int) ($this->input->get->page-1)*$limit : 0;
+
+        // put together LIMIT
+        $start = 0;
+        $limit = isset($this->input->get->limit) ? (int) $this->input->get->limit : $this->row_limit;
+        if ($limit && $total > $limit) {
+            if ($this->input->get->page) $start = ($this->input->get->page-1)*$limit;
             if ($start > $total) $start = $total-$limit;
         }
+        
+        // put together ORDER BY
+        $sort = $this->input->get->sort ? $this->db->real_escape_string($this->input->get->sort) : "-login_timestamp";
+        $sort_order = (strpos($sort, "-") === 0) ? "DESC" : "ASC";
+        if ($sort_order == "DESC") $sort = substr($sort, 1);
+        $order_by = "ORDER BY $sort $sort_order, id DESC";
 
-        // if less than two matches were found, disable table sorting
-        if ($total < 2) $table->setSortable(false);
+        // stick pieces together to construct final SQL query
+        $query = "SELECT {$this->table_name}.* FROM {$this->table_name} $joins $where $order_by";
+        if ($limit) $query .= " LIMIT $start, $limit";
 
-        // fetch history rows from database
-        $sql = "SELECT *
-                FROM {$this->table_name}
-                $where 
-                ORDER BY login_timestamp DESC 
-                LIMIT $start, $limit";
-        $result = $this->db->query($sql);
+        // return SQL query along with some additional data
+        return array(
+            'query' => $query,
+            'total' => $total,
+            'start' => $start,
+            'limit' => $limit,
+        );
 
-        while($row = $result->fetch_assoc()) {
-
-            // empty container
-            $data = array();
-            
-            // escape values (just a precaution really)
-            foreach ($row as $key => $value) {
-                if ($key != "user_agent_features") $row[$key] = htmlentities($value);
-            }
-
-            // basic user information; if user_id is set user exists or at least existed at
-            // the time of login attempt (still need to check if that's currently true though)
-            if ($row['user_id']) {
-                $user = $this->users->get($row['user_id']);
-                if ($user->id) $data[$user->name] = $this->config->urls->admin."access/users/edit/?id=".$user->id;
-                else $data[] = $row['username'] . " <em>(" . __("removed") . ")</em>";
-            } else {
-                $data[] = $row['username'] . " <em>(" . __("nonexistent") . ")</em>";
-            }
-
-            // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
-            $date = ($this->date_format) ? date($this->date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
-            $data[] = "<span>{$row['login_timestamp']}</span>$date";
-
-            // status of login attempt
-            if ($row['login_was_successful']) $data[] = __("Yes");
-            else $data[] = "<em>" . __("No") . "</em>";
-
-            // link for removing individual history row
-            $data[] = "<a href='./delete/?id={$row['id']}' class='remove'>" . __("remove?") . "</a>";
-
-            // environment and user agent
-            if ($row['user_agent']) $data[] = $this->renderBrowserInfo($row['user_agent'], $row['user_agent_features']);
-            else $data[] = __("No data available.");
-
-            // add new table row
-            $table->row($data);
-            
-        }
-
-        // pager markup
-        $pager = "";
-        if ($total > $limit) {
-            $pager_links = 20;
-            $pager_page = (int) $start/$limit+1;
-            $pager_pages = ceil($total/$limit);
-            $pager = $this->renderPager($pager_links, $pager_page, $pager_pages);
-        }
-
-        // UI translations
-        $translations = "<div id='translations'>";
-        $translations .= "<span data-term='more'>" . __("more") . "</span>";
-        $translations .= "<span data-term='less'>" . __("less") . "</span>";
-        $translations .= "<span data-term='are_you_sure'>" . __("Are you sure?") . "</span>";
-        $translations .= "<span data-term='remove_failed'>" . __("Sorry, remove failed") . "</span>";
-        $translations .= "</div>";
-
-        // Basic information about found rows
-        $info = "<div id='info'><p>";
-        $info .= sprintf(_n("One matching row found.", "%d matching rows found.", $total), $total);
-        $info .= "</p></div>";
-
-        // return admin data table markup, pager and translations
-        return $this->renderFilters().$info.$table->render().$pager.$translations;
-
-    }    
+    }
 
     /**
      * Executed when requesting removal of an individual row
@@ -316,6 +321,50 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
         return true;
 
+    }
+
+    /**
+     * Parse MarkupAdminDataTable row from a row fetched from database
+     *
+     * @param array $row
+     */
+    private function parseTableRow(array $row) {
+
+        // container
+        $data = array();
+            
+        // escape values (just a precaution really)
+        foreach ($row as $key => $value) {
+            if ($key != "user_agent_features") $row[$key] = htmlentities($value);
+        }
+        
+        // basic user information; if user_id is set user exists or at least existed at
+        // the time of login attempt (still need to check if that's currently true though)
+        if ($row['user_id']) {
+            $user = $this->users->get($row['user_id']);
+            if ($user->id) $data[$user->name] = $this->config->urls->admin."access/users/edit/?id=".$user->id;
+            else $data[] = $row['username'] . " <em>(" . __("removed") . ")</em>";
+        } else {
+            $data[] = $row['username'] . " <em>(" . __("nonexistent") . ")</em>";
+        }
+        
+        // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
+        $date = ($this->date_format) ? date($this->date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
+        $data[] = "<span>{$row['login_timestamp']}</span>$date";
+        
+        // status of login attempt
+        if ($row['login_was_successful']) $data[] = __("Yes");
+        else $data[] = "<em>" . __("No") . "</em>";
+        
+        // link for removing individual history row
+        $data[] = "<a href='./delete/?id={$row['id']}' class='remove'>" . __("remove?") . "</a>";
+        
+        // environment and user agent
+        if ($row['user_agent']) $data[] = $this->renderBrowserInfo($row['user_agent'], $row['user_agent_features']);
+        else $data[] = __("No data available.");
+        
+        return $data;
+        
     }
 
     /**
@@ -634,7 +683,6 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * Called only when this module is installed
      *
      * Creates new page with this Process module assigned.
-     *
      */
     public function ___install() {
 
@@ -663,7 +711,6 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * Called only when this module is uninstalled
      *
      * Removes page associated with this Process module.
-     *
      */
     public function ___uninstall() {
 
