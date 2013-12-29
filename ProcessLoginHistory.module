@@ -32,7 +32,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 110,
+            'version' => 111,
             'singular' => true,
             'autoload' => false,
             'installs' => 'ProcessLoginHistoryHooks'
@@ -655,8 +655,8 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $b->device = __("desktop");
         
         // very rough device type detection
-        if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $b->device = __("mobile");
-        else if (preg_match("/iPad|Tablet/i", $user_agent)) $b->device = __("tablet");
+        if (preg_match("/iPad|Tablet|; GT-/i", $user_agent)) $b->device = __("tablet");
+        else if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $b->device = __("mobile");
 
         // identify platform
         if (preg_match("/\(([a-zA-Z0-9\.;:\/\-_ ]+)\)/", $user_agent, $match)) {
