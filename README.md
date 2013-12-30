@@ -1,6 +1,9 @@
 Process Login History Module
 ============================
 
+Login history module for ProcessWire CMS/CMF.
+Copyright (c) 2012-2013 Teppo Koivula
+
 This module keeps track of login attempts to your site, both successful and
 unsuccessful (tracking unsuccessful logins is off by default) in order to offer
 better understanding about users' activity and environments they use / favor;
@@ -90,3 +93,21 @@ for later releases:
 Icons used by this module are part of Blueberry Basic icon set, which is made
 freely available for any kind of commercial or non-commercial projects by
 Icojam. See http://www.icojam.com/blog/?p=259 for more information.
+
+## License
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+(See included LICENSE file for full license text.)
