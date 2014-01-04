@@ -226,7 +226,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
     }
 
     /**
-     * Build SQL query for fetching changelog data from custom database table
+     * Build SQL query for fetching history data from custom database table
      *
      * @param array $group_by Fields to group results by, such as "id"
      * @return array Array with SQL query ('query'), total row count ('total'),
