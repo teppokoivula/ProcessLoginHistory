@@ -19,6 +19,7 @@
  * Licensed under GNU/GPL v2, see LICENSE.TXT
  * 
  * http://processwire.com
+ *
  */
 class ProcessLoginHistory extends Process implements ConfigurableModule {
     
@@ -33,7 +34,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 111,
+            'version' => 120,
             'singular' => true,
             'autoload' => false,
             'installs' => 'ProcessLoginHistoryHooks'
@@ -73,9 +74,16 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * construct(), but before init().
      */
     public function __construct() {
-        // Get name of database table from ProcessLoginHistoryHooks
+        // Get name of database table and any available module config settings
+        // from ProcessLoginHistoryHooks module
         if ($this->modules->isInstalled("ProcessLoginHistoryHooks")) {
             $this->table_name = ProcessLoginHistoryHooks::TABLE_NAME;
+            $data = $this->modules->getModuleConfigData("ProcessLoginHistoryHooks");
+            $defaults = $this->modules->get("ProcessLoginHistoryHooks")->getDefaultData();
+            $data = array_merge($defaults, $data);
+            foreach ($data as $key => $value) {
+                $this->$key = $value;
+            }
         }
         foreach(self::getDefaultData() as $key => $value) {
             $this->$key = $value;
@@ -129,6 +137,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
     /**
      * Initialization function called before any execute functions
+     *
      */
     public function init() {
         parent::init();
@@ -151,13 +160,15 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $table = $this->modules->get("MarkupAdminDataTable");
         $table->setEncodeEntities(false);
         $table->setClass('history');
-        $table->headerRow(array(
+        $headerRow = array(
             __('User'),
             __('When'),
             __('Successful attempt?'),
             '', // placeholder
-            __('More')
-        ));
+            __('More'),
+        );
+        if ($this->log_ip_addresses) array_splice($headerRow, 1, 0, __("IP"));
+        $table->headerRow($headerRow);
 
         // fetch rows from database and add them to our data table
         $query = $this->buildQuery();
@@ -370,6 +381,9 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $data[] = $row['username'] . " <em>(" . __("nonexistent") . ")</em>";
         }
         
+        // IP address
+        if ($this->log_ip_addresses) $data[] = $row['ip_address'];
+        
         // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
         $date = ($this->date_format) ? date($this->date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
         $data[] = "<span>{$row['login_timestamp']}</span>$date";
@@ -384,7 +398,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // environment and user agent
         if ($row['user_agent']) $data[] = $this->renderBrowserInfo($row['user_agent'], $row['user_agent_features']);
         else $data[] = __("No data available.");
-        
+
         return $data;
         
     }
@@ -705,6 +719,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * Called only when this module is installed
      *
      * Creates new page with this Process module assigned.
+     *
      */
     public function ___install() {
 
@@ -733,6 +748,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * Called only when this module is uninstalled
      *
      * Removes page associated with this Process module.
+     *
      */
     public function ___uninstall() {
 

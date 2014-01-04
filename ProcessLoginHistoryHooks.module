@@ -32,7 +32,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 108,
+            'version' => 110,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -40,10 +40,39 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * Name of database table used by this module
+     * Default configuration for this module
+     *
+     * The point of putting this in it's own function is so that you don't have to specify
+     * these defaults more than once.
+     *
+     * @return array
+     */
+    static public function getDefaultData() {
+        return array(
+            'schema_version' => 1,
+        );
+    }
+    
+    /**
+     * Name and latest schema version for database table used by this module
      *
      */
     const TABLE_NAME = 'process_login_history';
+    const SCHEMA_VERSION = 2;
+
+    /**
+     * Populate the default config data
+     *
+     * ProcessWire will automatically overwrite it with anything the user has specifically configured.
+     * This is done in construct() rather than init() because ProcessWire populates config data after
+     * construct(), but before init().
+     *
+     */
+    public function __construct() {
+        foreach(self::getDefaultData() as $key => $value) {
+            $this->$key = $value;
+        }
+    }
 
     /**
      * Module configuration
@@ -64,6 +93,15 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         $field->name = "log_nonexistent_users";
         $field->label = __("Log nonexistent users");
         $field->description = __("If this option is selected, attempts to log in as nonexistent users will be logged.");
+        if (isset($data[$field->name])) $field->checked = "checked";
+        $fields->add($field);
+
+        // enable logging of user's IP address?
+        $field = $modules->get("InputfieldCheckbox");
+        $field->name = "log_ip_addresses";
+        $field->label = __("Log IP addresses");
+        $field->description = __("Enable logging IP addresses of users logging in (or attempting to)?");
+        $field->notes = __("IP addresses can be considered personal data, which is why logging them is not enabled by default.");
         if (isset($data[$field->name])) $field->checked = "checked";
         $fields->add($field);
 
@@ -98,6 +136,11 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      *
      */
     public function init() {
+
+        // update database schema (if not the latest one yet)
+        if ($this->schema_version < self::SCHEMA_VERSION) {
+            $this->updateDatabaseSchema();
+        }
 
         // remove expired history rows daily
         $this->addHook("LazyCron::everyDay", $this, 'cleanup');
@@ -174,9 +217,15 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             $user_agent_features = null;
         }
 
+        // REMOTE_ADDR is the IP address from which this request came from, but
+        // it could still be that of a proxy. Proxies often use X-Forwarded-For
+        // header to identify original source, but headers are unreliable (easy
+        // to fake) and thus we wouldn't be able to trust it here anyway.
+        $ip_address = $this->log_ip_addresses ? "'{$_SERVER['REMOTE_ADDR']}'" : "NULL";
+
         // insert new row into database
-        $sql_fields = "user_id, username, login_was_successful, user_agent, user_agent_features";
-        $sql_values = "$user_id, '$username', $login_was_successful, '$user_agent', '$user_agent_features'";
+        $sql_fields = "user_id, username, login_was_successful, user_agent, user_agent_features, ip_address";
+        $sql_values = "$user_id, '$username', $login_was_successful, '$user_agent', '$user_agent_features', $ip_address";
         $sql = "INSERT INTO " . self::TABLE_NAME . " ($sql_fields) VALUES ($sql_values)";
         $this->db->query($sql);
 
@@ -284,6 +333,33 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         
     }
 
+    /**
+     * Update database schema
+     *
+     * This method applies incremental updates until latest schema version is
+     * reached, while also keeping schema_version config setting up to date.
+     *
+     */
+    private function updateDatabaseSchema() {
+        while ($this->schema_version < self::SCHEMA_VERSION) {
+            ++$this->schema_version;
+            switch ($this->schema_version) {
+                case 2:
+                    $sql = "ALTER TABLE " . self::TABLE_NAME . " ADD ip_address VARCHAR(45) AFTER user_agent_features";
+                    break;
+                default:
+                    throw new WireException("Unrecognized database schema version: $this->schema_version");
+            }
+            if ($sql && $this->db->query($sql)) {
+                $configData = $this->modules->getModuleConfigData($this);
+                $configData['schema_version'] = $this->schema_version;
+                $this->modules->saveModuleConfigData($this, $configData);
+            } else {
+                throw new WireException("Couldn't update database schema to version $this->schema_version");
+            }
+        }
+    }
+    
     /**
      * Called only when this module is installed
      *
