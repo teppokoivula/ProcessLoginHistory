@@ -80,11 +80,16 @@ for later releases:
 
 **1.2**
 
+* IP address logging
+
+**1.3**
+
 * support for PHP's native get_browser()
 * support for Browser Capabilities PHP Project / phpbrowscap
   (https://github.com/GaretJax/phpbrowscap)
+* OS (platform) version sniffing
 
-**1.3**
+**1.4**
 
 * usage statistics, possibly even graphs
 
