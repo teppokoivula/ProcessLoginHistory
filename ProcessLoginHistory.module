@@ -34,9 +34,10 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 120,
+            'version' => 121,
             'singular' => true,
             'autoload' => false,
+            'permission' => 'login-history',
             'installs' => 'ProcessLoginHistoryHooks'
         ); 
     }
@@ -742,6 +743,16 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // tell user that we've created a new page
         $this->message("Created Page: {$page->path}"); 
 
+        // create login-history permission
+        $permission = $this->permissions->get("login-history");
+        if (!$permission->id) {
+            $permission = new Permission();
+            $permission->name = "login-history";
+            $permission->title = $this->_("Access login history");
+            $permission->save();
+            $this->message("Created Permission: {$permission->name}");
+        }
+
     }
 
     /**
@@ -761,6 +772,13 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             // if we found the page, let the user know and delete it
             $this->message("Deleting Page: {$page->path}"); 
             $page->delete();
+        }
+
+        // delete login-history permission
+        $permission = $this->permissions->get("login-history");
+        if ($permission->id) {
+            $this->message("Deleting Permission: {$permission->name}");
+            $permission->delete();
         }
 
     }
