@@ -1,17 +1,19 @@
 $(document).ready(function() {
+    // index of environment (more) column
+    var env_index = $('table.history thead th').length-1;
     // more/less links
     var more = $('span[data-term=more]').text();
     var less = $('span[data-term=less]').text();
     $('table.history tr').each(function() {
         $(this)
-            .find('td:eq(5)')
+            .find('td:eq(' + env_index + ')')
                 .addClass('user-agent')
                 .wrapInner('<span></span>')
                 .find('span')
                     .after('<a href="#" class="toggle-more">'+more+' <b>&or;</b></a>');
     });
     // more/less functionality
-    $('table.history th:eq(5)').css('width', '100px');
+    $('table.history th:eq(' + env_index + ')').css('width', '100px');
     $('table.history td.user-agent a').toggle(function() {
         $(this)
             .html(less + ' <b>&and;</b>')
