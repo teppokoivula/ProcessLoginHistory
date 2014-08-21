@@ -34,11 +34,12 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 122,
+            'version' => 123,
             'singular' => true,
             'autoload' => false,
+            'icon' => 'terminal',
             'permission' => 'login-history',
-            'installs' => 'ProcessLoginHistoryHooks'
+            'installs' => 'ProcessLoginHistoryHooks',
         ); 
     }
     
@@ -257,12 +258,10 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
         // Possible values for 'when' filter
         $allowed_intervals = array(
-            __("whenever"),
             __("within a day") => '1 DAY',
             __("within a week") => '1 WEEK',
             __("within a month") => '1 MONTH',
             __("within a year") => '1 YEAR',
-            __("between") => "between",
         );
 
         foreach ($this->input->get as $key => $value) {
@@ -478,7 +477,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             __("Successful login attempts") => "1",
             __("Unsuccessful login attempts") => "0",
         );
-        $markup .= $this->renderSelect('login_was_succesful', $options);
+        $markup .= $this->renderSelect('login_was_successful', $options);
 
         // Username
         $options = array();
@@ -542,7 +541,19 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                  . " class='loginhistory-datepicker'"
                  . " />";
 
-        if ($markup) return "<form id='filters'>$markup</form>";
+        if ($markup) {
+            $form = $this->modules->get('InputfieldForm');
+            $form->attr('id', 'filters');
+            $form->attr('method', 'get');
+            $fieldset = $this->modules->get('InputfieldFieldset');
+            $fieldset->label = __('Filters');
+            $fieldset->icon = 'filter';
+            $field = $this->modules->get('InputfieldMarkup');
+            $field->markupText = $markup;
+            $fieldset->append($field);
+            $form->append($fieldset);
+            return $form->render();
+        }
         
     }
 

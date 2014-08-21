@@ -1,23 +1,12 @@
 /* ProcessLoginHistory */
 
-form#filters {
-    font-size: 1em;
-    position: relative;
-    border-radius: 5px;
-    background: #e9eff1;
-    border: 1px solid #dbe3e5;
-    padding: 1.2em 1em 1.4em 1em;
-}
-
 form#filters select,
 form#filters .loginhistory-datepicker {
-    border: 1px solid #dbe3e5;
-    border-radius: 3px;
-    padding: 5px;
+    margin: 0 1% 0 0;
 }
 
 form#filters .loginhistory-datepicker {
-    padding: 6px 5px;
+    margin-right: 0;
 }
 
 form#filters select.disabled,
@@ -76,8 +65,9 @@ table.history tr.more table {
     margin: 0;
 }
 
-table.history tr.more table th,
-table.history tr.more table td {
+.content table.history tr.more table th,
+.content table.history tr.more table td {
+    background: transparent;
     padding-right: 20px;
     border-bottom: 0;
     font-size: 1em;
@@ -110,28 +100,18 @@ table.history span {
 
 /* ProcessUser */
 
-div.user-login-history {
-    font-size: 1em;
-    position: relative;
-    border-radius: 5px;
-    background: #e9eff1;
-    margin-bottom: 1em;
-    border: 1px solid #dbe3e5;
-    padding: 1.2em 1em 1.4em 1em;
-}
-
-div.user-login-history li {
+#user-login-history li {
     list-style-type: disc;
     margin: 0.5em 0 0 2em;
     display: list-item;
 }
 
-div.user-login-history em {
+#user-login-history em {
     opacity: 0.5;
     font-size: 0.9em;
     padding-left: 0.5em;
 }
 
-div.user-login-history p {
+#user-login-history p {
     margin: 1em 0 0 1em;
 }

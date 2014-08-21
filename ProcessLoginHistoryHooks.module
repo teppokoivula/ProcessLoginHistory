@@ -32,7 +32,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 110,
+            'version' => 111,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -151,8 +151,8 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         // hook after ProcessLogin::buildLoginForm to add useful extra fields
         $this->addHookAfter('ProcessLogin::buildLoginForm', $this, 'hookBuildLoginForm');
 
-        // hook after ProcessPageEdit::execute to add latest login rows to user profile (admin only)
-        $this->addHookAfter('ProcessPageEdit::execute', $this, 'hookProcessPageEditExecute');
+        // hook after ProcessPageEdit::buildForm to add latest login rows to user profile (admin only)
+        $this->addHookAfter('ProcessPageEdit::buildForm', $this, 'hookProcessPageEditBuildForm');
 
     }
 
@@ -245,14 +245,14 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * Function executed after Execute method of Process Page Edit
+     * Function executed after buildForm method of Process Page Edit
      *
      * The purpose of this is to add simplified version of login history
      * and links to full data of that particular user to user edit view.
      *
      * @param HookEvent $event
      */
-    public function hookProcessPageEditExecute(HookEvent $event) {
+    public function hookProcessPageEditBuildForm(HookEvent $event) {
 
         // this only applies to user edit view (admin)
         if ($event->object->page->process != "ProcessUser") return;
@@ -320,16 +320,20 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         }
         
         // put together final markup
-        $login_info = "<div class='user-login-history'>"
-                    . "<ul>$markup</ul>"
+        $login_info = "<ul>$markup</ul>"
                     . "<p><a href='{$login_history_page->url}?username={$user->name}'>"
                     . __("View entire login history for this user")
-                    . " &raquo;</a></p>"
-                    . "</div>";
+                    . " &raquo;</a></p>";
+        $field = $this->modules->get('InputfieldMarkup');
+        $field->collapsed = Inputfield::collapsedYes;
+        $field->attr('id', 'user-login-history');
+        $field->markupText = $login_info;
+        $field->label = __("Login History");
         
-        // load main modules styles and prepend created markup to event return value
+        // load main modules styles and add created markup to edit form
         $this->config->styles->add($this->config->urls->ProcessLoginHistory."ProcessLoginHistory.css?v=102");
-        $event->return = $login_info . $event->return;
+        $submit = $event->return->find('name=submit_save')->first();
+        $event->return->insertBefore($field, $submit);
         
     }
 
