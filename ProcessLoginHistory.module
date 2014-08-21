@@ -11,7 +11,7 @@
  *
  * For detailed information, installation instructions etc. see README.md.
  *
- * @copyright Copyright (c) 2012-2013, Teppo Koivula
+ * @copyright Copyright (c) 2012-2014, Teppo Koivula
  * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License, version 2
  *
  * ProcessWire 2.x 
@@ -34,7 +34,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 123,
+            'version' => 124,
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -192,12 +192,14 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         }
 
         // UI translations
-        $translations = "<div id='translations'>";
-        $translations .= "<span data-term='more'>" . __("more") . "</span>";
-        $translations .= "<span data-term='less'>" . __("less") . "</span>";
-        $translations .= "<span data-term='are_you_sure'>" . __("Are you sure?") . "</span>";
-        $translations .= "<span data-term='remove_failed'>" . __("Sorry, remove failed") . "</span>";
-        $translations .= "</div>";
+        $this->config->js($this->className(), array(
+            'i18n' => array(
+                'more' => __("more"),
+                'less' => __("less"),
+                'areYouSure' => __("Are you sure?"),
+                'removeFailed' => __("Sorry, remove failed"),
+            ),
+        ));
 
         // Basic information about found rows
         $info = "<div id='info'><p>";

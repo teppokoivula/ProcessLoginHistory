@@ -1,22 +1,22 @@
 $(document).ready(function() {
+    // translations etc. are defined in ProcessLoginHistory.module
+    var moduleConfig = config.ProcessLoginHistory;
     // index of environment (more) column
     var env_index = $('table.history thead th').length-1;
     // more/less links
-    var more = $('span[data-term=more]').text();
-    var less = $('span[data-term=less]').text();
     $('table.history tr').each(function() {
         $(this)
             .find('td:eq(' + env_index + ')')
                 .addClass('user-agent')
                 .wrapInner('<span></span>')
                 .find('span')
-                    .after('<a href="#" class="toggle-more">'+more+' <b>&or;</b></a>');
+                    .after('<a href="#" class="toggle-more">'+moduleConfig.i18n.more+' <b>&or;</b></a>');
     });
     // more/less functionality
     $('table.history th:eq(' + env_index + ')').css('width', '100px');
     $('table.history td.user-agent a').toggle(function() {
         $(this)
-            .html(less + ' <b>&and;</b>')
+            .html(moduleConfig.i18n.less + ' <b>&and;</b>')
             .parents('tr:first')
                 .addClass('open')
                 .after('<tr class="more '+$(this).prev('span').find('#device-type td').text()+'-device"><td colspan="6"><div>'+$(this).prev('span').html()+'</div></td></tr>');
@@ -31,17 +31,15 @@ $(document).ready(function() {
         return false;
     });
     // remove link
-    var are_you_sure = $('span[data-term=are_you_sure]').text();
-    var remove_failed = $('span[data-term=remove_failed]').text();
     $('table.history a.remove').live('click', function() {
-        if (confirm(are_you_sure)) {
+        if (confirm(moduleConfig.i18n.areYouSure)) {
             var $link = $(this);
             $.get($(this).attr('href'), function(data) {
                 data = $.parseJSON(data);
                 if (data && !data.error) {
                     $($link).parents('tr:first').fadeOut('500');
                 } else {
-                    alert(remove_failed);
+                    alert(moduleConfig.i18n.removeFailed);
                 }
             });
         }
