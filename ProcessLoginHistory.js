@@ -23,7 +23,7 @@ $(document).ready(function() {
         return false;
     }, function() {
         $(this)
-            .html(more + ' <b>&or;</b>')
+            .html(moduleConfig.i18n.more + ' <b>&or;</b>')
             .parents('tr:first')
                 .removeClass('open')
                 .next('tr.more')
