@@ -34,7 +34,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 125,
+            'version' => 126,
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -206,8 +206,8 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $info .= sprintf(_n("One matching row found.", "%d matching rows found.", $query['total']), $query['total']);
         $info .= "</p></div>";
 
-        // return admin data table markup, pager and translations
-        return $filters . $info . $table->render() . $pager . $translations;
+        // return admin data table markup and pager
+        return $filters . $info . $table->render() . $pager;
 
     }    
 
