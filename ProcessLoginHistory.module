@@ -34,7 +34,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 126,
+            'version' => 127,
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
