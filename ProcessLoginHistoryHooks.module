@@ -32,7 +32,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 111,
+            'version' => 112,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory'
@@ -195,7 +195,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         // try to get user matching given username
         if (strtolower($username) == $this->sanitizer->pageName($username)) {
-            $user = $this->users->get($username);
+            $user = $this->users->get("name=$username");
             if ($user->id) {
                 $user_id = $user->id;
                 if ($event->return) $login_was_successful = 1;
