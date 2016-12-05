@@ -1,90 +1,130 @@
 $(document).ready(function() {
-    // translations etc. are defined in ProcessLoginHistory.module
-    var moduleConfig = config.ProcessLoginHistory;
-    // index of environment (more) column
-    var env_index = $('table.history thead th').length-1;
-    // more/less links
-    $('table.history tr').each(function() {
-        $(this)
-            .find('td:eq(' + env_index + ')')
-                .addClass('user-agent')
-                .wrapInner('<span></span>')
-                .find('span')
-                    .after('<a href="#" class="toggle-more">'+moduleConfig.i18n.more+' <b>&or;</b></a>');
-    });
-    // more/less functionality
-    $('table.history th:eq(' + env_index + ')').css('width', '100px');
-    $('table.history td.user-agent a').toggle(function() {
-        $(this)
-            .html(moduleConfig.i18n.less + ' <b>&and;</b>')
-            .parents('tr:first')
-                .addClass('open')
-                .after('<tr class="more '+$(this).prev('span').find('#device-type td').text()+'-device"><td colspan="6"><div>'+$(this).prev('span').html()+'</div></td></tr>');
-        return false;
-    }, function() {
-        $(this)
-            .html(moduleConfig.i18n.more + ' <b>&or;</b>')
-            .parents('tr:first')
-                .removeClass('open')
-                .next('tr.more')
-                    .remove();
-        return false;
-    });
-    // remove link
-    $('table.history a.remove').live('click', function() {
-        if (confirm(moduleConfig.i18n.areYouSure)) {
-            var $link = $(this);
-            $.get($(this).attr('href'), function(data) {
-                data = $.parseJSON(data);
-                if (data && !data.error) {
-                    $($link).parents('tr:first').fadeOut('500');
-                } else {
-                    alert(moduleConfig.i18n.removeFailed);
+
+    var initLog = function() {
+        
+        var $table = $('table.log');
+        var $filters = $('form#filters');
+        
+        // more/less links
+        $table.find('> tbody > tr').each(function() {
+            $(this)
+                .find('> td:last-child')
+                .wrapInner('<span class="hidden"></span>')
+                .append('<a class="more">'+config.log.i18n.more+'</a>');
+        });
+        
+        // more/less functionality
+        $table.on('click', 'a.more', function() {
+            var $tr = $(this).parents('tr:first').toggleClass('open');
+            $(this).text(config.log.i18n[$tr.hasClass('open') ? 'less' : 'more']);
+            if ($tr.hasClass('open')) {
+                var colspan = $tr.find('> td').length;
+                var details = $(this).prev('.hidden').html();
+                $tr.after('<tr class="more"><td colspan="' + colspan + '"><div>' + details + '</div></td></tr>');
+            } else {
+                $tr.next('tr.more').remove();
+            }
+        });
+        
+        // remove link
+        $table.on('click', 'a.remove-row', function() {
+            if (confirm(config.log.i18n.areYouSure)) {
+                var $link = $(this);
+                $.get($link.attr('href'), function(data) {
+                    data = $.parseJSON(data);
+                    if (data && !data.error) {
+                        $link.parents('tr:first').fadeOut('500');
+                    } else {
+                        alert(config.log.i18n.removeFailed);
+                    }
+                });
+            }
+            return false;
+        });
+        
+        // hide extra info when ordering data
+        $table.on('click', 'th.tablesorter-header', function() {
+            $table.find('tr.open a.more').trigger('click');
+        });
+        
+        // when data is filtered by id and only one row exists, show info by default
+        if ($table.find('a.more').length == 1 && window.location.search.match(/[?&]id=/)) {
+            $table.find('a.more').trigger('click');
+        }
+        
+        // AJAX filter form
+        $filters.on('change', 'select, input', function() {
+            updateContent('?' + $filters.serialize());
+        });
+        
+        // AJAX links
+        $table.parent().off('click.ajax').on('click.ajax', 'a.ajax', function(event) {
+            event.preventDefault();
+            updateContent($(this).attr('href'));
+        });
+        
+        // AJAX pagination
+        $('.MarkupPagerNavCustom').on('click', 'a', function(event) {
+            event.preventDefault();
+            var params = $(this).attr('href');
+            $('html, body').animate({
+                scrollTop: $('#info').offset().top
+            }, 500, function() {
+                updateContent(params);
+            });
+        });
+        
+        // hide irrelevant options in filter form
+        var $when = $filters.find('select[name=when]');
+        if ($when.length && $when.attr('value') != "between") {
+            $filters.find('.log-datepicker')
+                .parent('div')
+                .addClass('disabled')
+                .end()
+                .attr('title', $filters.find('input[name=date_from]').attr('data-disabled-title'))
+                .attr('disabled', 'disabled');
+        }
+        
+        // init datepicker
+        $('.log-datepicker').each(function() {
+            var options = {
+            dateFormat: $(this).attr('data-dateformat'),
+                minDate: $(this).attr('data-mindate'),
+                maxDate: $(this).attr('data-maxdate')
+            };
+            $(this).datepicker(options);
+        });
+        
+        // layout fix for filter fieldset label (required when content is updated via AJAX)
+        $(".Inputfield:not(.collapsed9) > .InputfieldHeader").addClass("InputfieldStateToggle");
+
+    }
+    
+    // update content via AJAX
+    var updateXHR;
+    var updateContent = function(params) {
+        var $spinner = $('#info h2 i.fa-spinner');
+        if (!$spinner.length || $spinner.data('params') != params) {
+            if ($spinner.length && updateXHR) updateXHR.abort();
+            $spinner = $('<i class="fa fa-spinner fa-spin"></i>').data('params', params);
+            $('#info h2').append($spinner);
+            history.replaceState(null, null, params);
+            var updateXHR = $.ajax({
+                url: params,
+                error: function(xhr, textStatus, errorThrown) {
+                    alert(textStatus);
+                },
+                success: function(data, textStatus) {
+                    $('#info').parent().html(data);
+                },
+                complete: function(xhr, textStatus) {
+                    initLog();
                 }
             });
         }
-        return false;
-    });
-    // hide extra info when ordering data
-    $('table.history th.header').click(function() {
-        $('table.history tr.open a.toggle-more').click();
-    });
-    // when data is filtered by id and only one row exists, show info by default
-    var getp = window.location.search.replace("?", "");
-    if (getp.substr(0,3) == "id=" && $('a.toggle-more').length == 1) {
-        $('a.toggle-more').click();
     }
-    // filter form autosubmit
-    $('form#filters select, form#filters input').change(function() {
-        this.form.submit();
-    });
-    // hide nonrelevant options in filter form
-    if (
-        $('form#filters select[name=username] option[selected]').attr('value') ||
-        $('form#filters select[name=login_was_successful] option[selected]').attr('value') == 1
-    ) {
-        $('form#filters select[name=user_id]')
-            .find('option:first')
-                .attr('selected', 'selected')
-                .end()
-            .addClass('disabled')
-            .attr('title', $('form#filters select[name=user_id]').attr('data-disabled-title'))
-            .attr('disabled', 'disabled');
-    }
-    var $when = $('form#filters select[name=when]');
-    if ($when.length && $when.attr('value') != "between") {
-        $('form#filters .loginhistory-datepicker')
-            .addClass('disabled')
-            .attr('title', $('form#filters input[name=date_from]').attr('data-disabled-title'))
-            .attr('disabled', 'disabled');
-    }
-    // datepicker
-    $('.loginhistory-datepicker').each(function() {
-        var options = {
-            dateFormat: $(this).attr('data-dateformat'),
-            minDate: $(this).attr('data-mindate'),
-            maxDate: $(this).attr('data-maxdate')
-        };
-        $(this).datepicker(options);
-    });
+    
+    // init
+    initLog();
+    
 });

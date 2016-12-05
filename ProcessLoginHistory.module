@@ -11,15 +11,9 @@
  *
  * For detailed information, installation instructions etc. see README.md.
  *
- * @copyright Copyright (c) 2012-2014, Teppo Koivula
+ * @copyright Copyright (c) 2012-2016, Teppo Koivula
  * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License, version 2
- *
- * ProcessWire 2.x 
- * Copyright (C) 2012 by Ryan Cramer 
- * Licensed under GNU/GPL v2, see LICENSE.TXT
- * 
- * http://processwire.com
- *
+ * @todo consiider recording logouts too
  */
 class ProcessLoginHistory extends Process implements ConfigurableModule {
     
@@ -34,7 +28,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 128,
+            'version' => 130,
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -67,7 +61,18 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * Name of database table used by this module
      */
     protected $table_name;
-
+    
+    /**
+     * Array of optional permissions
+     * 
+     * - If "login-history-remove" exists, user has to have it in order to
+     *   remove rows. If not, every user with access to this module can
+     *   also remove rows.
+     * 
+     * @var array
+     */
+    protected $optional_permissions = array();
+    
     /**
      * Populate the default config data
      *
@@ -90,8 +95,11 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         foreach(self::getDefaultData() as $key => $value) {
             $this->$key = $value;
         }
+        $this->optional_permissions = array(
+            'remove' => $this->permissions->get('login-history-remove'),
+        );
     }
-
+    
     /**
      * Module configuration
      *
@@ -99,26 +107,26 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * @return InputfieldWrapper
      */
     static public function getModuleConfigInputfields(array $data) {
-
+        
         // this is a container for fields, basically like a fieldset
         $fields = new InputfieldWrapper();
-
+        
         // since this is a static function, we can't use $this->modules, so get them from the global wire() function
         $modules = wire('modules');
-
+        
         // merge default config settings (custom values overwrite defaults)
         $defaults = self::getDefaultData();
         $data = array_merge($defaults, $data);
-
+        
         // date format used
         $field = $modules->get("InputfieldText");
         $field->name = "date_format";
         $field->label = "Date Format";
         $field->notes = "See the [PHP date](http://www.php.net/manual/en/function.date.php) function reference for more information on how to customize this format.";
-        $field->value = ($data['date_format']) ? $data['date_format'] : $defaults['date_format'];
+        $field->value = $data['date_format'] ? $data['date_format'] : $defaults['date_format'];
         $field->size = 70;
         $fields->add($field);
-
+        
         // number of results visible at once
         $field = $modules->get("InputfieldSelect");
         $field->name = "row_limit";
@@ -133,10 +141,10 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         ));
         $field->value = $data['row_limit'];
         $fields->add($field);
-
+        
         return $fields;
     }
-
+    
     /**
      * Initialization function called before any execute functions
      *
@@ -147,41 +155,47 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $defaults = self::getDefaultData();
         if ($this->date_format == $defaults['date_format']) unset($this->date_format);
     }
-
+    
     /**
      * Executed when a page with this Process assigned is accessed
      *
      * @return string
      */
     public function ___execute() {
-
+        
+        // make sure that we have a newish version of Font-Awesome loaded
+        if (version_compare($this->config->version, '3.0.18', '<')) {
+            $this->config->styles->add('//maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css');
+        }
+        
         // render filters
         $filters = $this->renderFilters();
         
         // setup admin data table for history
         $table = $this->modules->get("MarkupAdminDataTable");
         $table->setEncodeEntities(false);
-        $table->setClass('history');
+        $table->setClass('log');
         $headerRow = array(
-            __('User'),
             __('When'),
+            __('Who'),
             __('Successful attempt?'),
             '', // placeholder
             __('More'),
         );
-        if ($this->log_ip_addresses) array_splice($headerRow, 1, 0, __("IP"));
+        if ($this->log_ip_addresses) array_splice($headerRow, 2, 0, __("IP"));
         $table->headerRow($headerRow);
-
+        
         // fetch rows from database and add them to our data table
         $query = $this->buildQuery();
-        $result = $this->db->query($query['query']);
-        while ($row = $result->fetch_assoc()) {
+        $stmt = $this->database->prepare($query['query']); 
+        $stmt->execute();
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $table->row($this->parseTableRow($row));
         }
-
+        
         // if less than two matches were found, disable table sorting
         if ($query['total'] < 2) $table->setSortable(false);
-
+        
         // pager markup
         $pager = "";
         if ($query['limit'] && $query['total'] > $query['limit']) {
@@ -190,9 +204,9 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $pager_pages = ceil($query['total']/$query['limit']);
             $pager = $this->renderPager($pager_links, $pager_page, $pager_pages);
         }
-
+        
         // UI translations
-        $this->config->js($this->className(), array(
+        $this->config->js('log', array(
             'i18n' => array(
                 'more' => __("more"),
                 'less' => __("less"),
@@ -200,35 +214,86 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 'removeFailed' => __("Sorry, remove failed"),
             ),
         ));
-
-        // Basic information about found rows
-        $info = "<div id='info'><p>";
+        
+        // basic information about found rows
+        $info = "<div id='info'><h2>";
         $info .= sprintf(_n("One matching row found.", "%d matching rows found.", $query['total']), $query['total']);
-        $info .= "</p></div>";
-
+        $info .= "</h2></div>";
+        
+        // feed links
+        $feeds = "<ul id='feeds'>";
+        $feeds .= "<li><a href='./rss/' target='_blank'>" . __('RSS') . "</a></li>";
+        if ($this->modules->isInstalled('ProcessLoginHistoryRSS')) {
+            $loginHistoryRSS = $this->modules->get('ProcessLoginHistoryRSS');
+            if ($loginHistoryRSS->feed_url && $loginHistoryRSS->show_feed_link) {
+                $feeds .= "<li><a href='{$loginHistoryRSS->feed_url}' target='_blank'>" . __('Public RSS') . "</a></li>";
+            }
+        }
+        $feeds .= "</ul>";
+        
         // return admin data table markup and pager
-        return $filters . $info . $table->render() . $pager;
-
-    }    
-
+        return $filters . $info . $table->render() . $pager . $feeds;
+        
+    }
+    
     /**
      * Executed when a page with this Process assigned is accessed with /JSON/
      *
      */
     public function ___executeJSON() {
-
+        
         // fetch rows from database
         $data = array();
         $query = $this->buildQuery();
-        $result = $this->db->query($query['query']);
-        while ($row = $result->fetch_assoc()) $data[] = $row;
-
+        $stmt = $this->database->prepare($query['query']);
+        $stmt->execute();
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $data[] = $row;
+        
         // send header and output JSON
         header('Content-type: application/json');
         exit(json_encode($data));
-
+        
     }
-
+    
+    /**
+     * Executed when a page with this Process assigned is accessed with /RSS/
+     *
+     */
+    public function ___executeRSS() {
+        
+        // create rss element
+        $rss = new SimpleXMLElement('<rss/>');
+        $rss->addAttribute('version', '2.0');
+        
+        // create channel eelment
+        $channel = $rss->addChild('channel');
+        $channel->addChild('title', __('Login History'));
+        $channel->addChild('link', $this->input->httpUrl . ($_GET ? '?' . htmlentities($this->input->queryString) : ''));
+        $channel->addChild('description', __('An automatically generated login history for this site.'));
+        
+        // fetch rows from database
+        $data = array();
+        $query = $this->buildQuery();
+        $stmt = $this->database->prepare($query['query']);
+        $stmt->execute();
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $item = $channel->addChild('item');
+            $item->addChild('title', $this->parseString($row));
+            if ($row['user_agent']) {
+                $item->addChild('description', $this->renderBrowserInfo($row['user_agent'], $row['user_agent_features']));
+            } else {
+                $item->addChild('description', __("No data available."));
+            }
+            $item->addChild('link', 'http' . ($this->config->https ? 's' : '') . '://' . $this->config->httpHost . $this->config->urls->admin . 'setup/' . self::PAGE_NAME . '/?id=' . (int) $row['id']);
+            $item->addChild('pubDate', date('r', strtotime($row['login_timestamp'])));
+        }
+        
+        // send header and output RSS
+        header('Content-type: application/rss+xml; charset=UTF-8');
+        exit($rss->asXML());
+        
+    }
+    
     /**
      * Build SQL query for fetching history data from custom database table
      *
@@ -237,13 +302,13 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      *         start ('start') and limit ('limit')
      */
     private function buildQuery(array $group_by = array()) {
-
+        
         // $joins and $where arrays are used to construct where clause and joins
         // later. $where contains rules like "key = '$value'" and $joins actual
         // joins, such as "LEFT JOIN table ON table.id = $id".
         $joins = array();
         $where = array();
-
+        
         // Allowed keys (GET params used to build queries) are defined here to
         // make sure we're not letting any weird queries get past us.
         $allowed_keys = array(
@@ -257,7 +322,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             "date_from",
             "date_until",
         );
-
+        
         // Possible values for 'when' filter
         $allowed_intervals = array(
             __("within a day") => '1 DAY',
@@ -265,22 +330,22 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             __("within a month") => '1 MONTH',
             __("within a year") => '1 YEAR',
         );
-
+        
         foreach ($this->input->get as $key => $value) {
             if (in_array($key, $allowed_keys) && $value != "") {
                 $operator = "=";
-                $value = $this->db->real_escape_string($value);
+                $value = $this->database->escapeStr($value);
                 if (strpos($value, "!") === 0) {
                     $operator = "!=";
                     $value = substr($value, 1);
                 }
                 switch ($key) {
                     case "user_agent":
-                        $where[] = "$key LIKE '%$value%'";
+                        $where[] = "{$key} LIKE '%{$value}%'";
                         break;
                     case "when":
                         if (!isset($where['date_from']) && !isset($where['date_until']) && in_array($value, $allowed_intervals)) {
-                            $where[$key] = "DATE_SUB(CURDATE(), INTERVAL $value) <= login_timestamp";
+                            $where[$key] = "DATE_SUB(CURDATE(), INTERVAL {$value}) <= login_timestamp";
                         }
                         break;
                     case "date_from":
@@ -293,26 +358,28 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                                 $operator = ">=";
                                 $time = "00:00";
                             }
-                            $where[$key] = "login_timestamp $operator '$value $time'";
+                            $where[$key] = "login_timestamp {$operator} '{$value} {$time}'";
                         }
                         break;
                     default:
-                        $where[] = "$key $operator '$value'";
+                        $where[] = "{$key} {$operator} '{$value}'";
                 }
             }
         }
-
+        
         // put together WHERE clause, required JOINs and GROUP BY
         $where = $where ? "WHERE " . implode(" AND ", $where) : "";
         $joins = $joins ? " " . implode(" ", $joins) : "";
         $group_by = $group_by ? "GROUP BY " . implode(", ", $group_by) : "";
-
+        
         // total count of rows in database table
         $count = $group_by ? "DISTINCT " . substr($group_by, 9) : "*";
-        $sql = "SELECT COUNT($count) FROM {$this->table_name} $joins $where";
-        $row = $this->db->query($sql)->fetch_row();
+        $sql = "SELECT COUNT($count) FROM {$this->table_name} {$joins} {$where}";
+        $stmt = $this->database->prepare($sql); 
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_NUM);
         $total = reset($row);
-
+        
         // put together LIMIT
         $start = 0;
         $limit = isset($this->input->get->limit) ? (int) $this->input->get->limit : $this->row_limit;
@@ -322,15 +389,15 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         }
         
         // put together ORDER BY
-        $sort = $this->input->get->sort ? $this->db->real_escape_string($this->input->get->sort) : "-login_timestamp";
-        $sort_order = (strpos($sort, "-") === 0) ? "DESC" : "ASC";
+        $sort = $this->input->get->sort ? $this->database->escapeStr($this->input->get->sort) : "-login_timestamp";
+        $sort_order = strpos($sort, "-") === 0 ? "DESC" : "ASC";
         if ($sort_order == "DESC") $sort = substr($sort, 1);
-        $order_by = "ORDER BY $sort $sort_order, id DESC";
-
+        $order_by = "ORDER BY {$sort} {$sort_order}, id DESC";
+        
         // stick pieces together to construct final SQL query
-        $query = "SELECT {$this->table_name}.* FROM {$this->table_name} $joins $where $group_by $order_by";
-        if ($limit) $query .= " LIMIT $start, $limit";
-
+        $query = "SELECT {$this->table_name}.* FROM {$this->table_name} {$joins} {$where} {$group_by} {$order_by}";
+        if ($limit) $query .= " LIMIT {$start}, {$limit}";
+        
         // return SQL query along with some additional data
         return array(
             'query' => $query,
@@ -340,31 +407,36 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         );
 
     }
-
+    
     /**
      * Executed when requesting removal of an individual row
      *
      * @return boolean
+     * @throws WirePermissionException if changelog-remove permission exists
+     *         but the current user doesn't have it.
      */
     public function ___executeDelete() {
-
-        if ((int) $this->input->get->id != $this->input->get->id) return false;
-
-        $id = (int) $this->input->get->id;
-        $sql = "DELETE FROM {$this->table_name} WHERE id = $id LIMIT 1";
-        $this->db->query($sql);
-
-        return true;
-
+        if (!$this->optional_permissions['remove']->id || $this->user->hasPermission($this->optional_permissions['remove'])) {
+            if ((int) $this->input->get->id != $this->input->get->id) return false;
+            $id = (int) $this->input->get->id;
+            $sql = "DELETE FROM {$this->table_name} WHERE id=:id LIMIT 1";
+            $query = $this->database->prepare($sql); 
+            $query->bindValue(':id', $id, PDO::PARAM_INT); 
+            $query->execute();
+            return 1;
+        } else {
+            throw new WirePermissionException(__("You do not have the permission required by this action."));
+        }
     }
-
+    
     /**
      * Parse MarkupAdminDataTable row from a row fetched from database
      *
      * @param array $row
+     * @return array
      */
     private function parseTableRow(array $row) {
-
+        
         // container
         $data = array();
             
@@ -373,38 +445,88 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             if ($key != "user_agent_features") $row[$key] = htmlentities($value);
         }
         
+        // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
+        $date = $this->date_format ? date($this->date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
+        $data[] = "<span class='hidden'>{$row['login_timestamp']}</span>{$date}";
+        
         // basic user information; if user_id is set user exists or at least existed at
         // the time of login attempt (still need to check if that's currently true though)
-        if ($row['user_id']) {
-            $user = $this->users->get($row['user_id']);
-            if ($user->id) $data[] = "<a href='{$this->config->urls->admin}access/users/edit/?id={$user->id}'>{$user->name}</a>";
-            else $data[] = $row['username'] . " <em>(" . __("removed") . ")</em>";
+        if (!$row['user_id']) {
+            // nonexistent user, no need to show an edit link
+            $data[] = "<span class='user guest' title='" . __("nonexistent") . "'>{$row['username']}</span>";
         } else {
-            $data[] = $row['username'] . " <em>(" . __("nonexistent") . ")</em>";
+            // check if user still exists and if yes, provide an edit link
+            $user = $this->users->get($row['user_id']);
+            if ($user->id) {
+                $data[] = "<a class='user' href='{$this->config->urls->admin}access/users/edit/?id={$user->id}'>{$user->name}</a>";
+            } else {
+                $data[] = "<span class='user deleted' title='" . __("deleted") . "'>{$row['username']}</span>";
+            }
         }
         
         // IP address
         if ($this->log_ip_addresses) $data[] = $row['ip_address'];
         
-        // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
-        $date = ($this->date_format) ? date($this->date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
-        $data[] = "<span>{$row['login_timestamp']}</span>$date";
-        
         // status of login attempt
-        if ($row['login_was_successful']) $data[] = __("Yes");
-        else $data[] = "<em>" . __("No") . "</em>";
+        $status = __("No");
+        if ($row['login_was_successful']) $status = __("Yes");
+        $selected = $this->input->get->login_was_successful == $row['login_was_successful'] ? ' selected' : '';
+        $query_string = htmlentities(http_build_query(array_merge($this->input->get->getArray(), array('login_was_successful' => $selected ? null : ($row['login_was_successful'] ? 1 : 0)))));
+        $data[] = "<a class='ajax tag status{$selected} status-" . ($row['login_was_successful'] ? 'yes' : 'no') . "' href='?{$query_string}'>{$status}</a>";
         
-        // link for removing individual history row
-        $data[] = "<a href='./delete/?id={$row['id']}' class='remove'>" . __("remove?") . "</a>";
+        // link for removing individual row
+        if (!$this->optional_permissions['remove']->id || $this->user->hasPermission($this->optional_permissions['remove'])) {
+            $data[] = "<a href='./delete/?id={$row['id']}' class='action remove-row'>" . __("remove?") . "</a>";
+        } else {
+            $data[] = "";
+        }
         
         // environment and user agent
         if ($row['user_agent']) $data[] = $this->renderBrowserInfo($row['user_agent'], $row['user_agent_features']);
         else $data[] = __("No data available.");
-
+        
         return $data;
         
     }
-
+    
+    /**
+     * Parse string from a row fetched from database
+     *
+     * @param array $row
+     * @return string
+     */
+    private function parseString(array $row) {
+        
+        $out = array();
+        
+        // escape values (just a precaution really)
+        foreach ($row as $key => $value) {
+            if ($key != "user_agent_features") $row[$key] = htmlentities($value);
+        }
+        
+        // basic user information; if user_id is set user exists or at least existed at
+        // the time of login attempt (still need to check if that's currently true though)
+        if (!$row['user_id']) {
+            // nonexistent user
+            $out[] = $row['username'] . " (" . __("nonexistent") . ")";
+        } else {
+            // check if user still exists and if yes, provide an edit link
+            $user = $this->users->get($row['user_id']);
+            $out[] = $user->id ? $user->name : $row['username'] . " (" . __("deleted") . ")";
+        }
+        
+        // IP address
+        if ($this->log_ip_addresses) $out[] = $row['ip_address'];
+        
+        // status of login attempt
+        $status = __("No");
+        if ($row['login_was_successful']) $status = __("Yes");
+        $out[] = $status;
+        
+        return implode(" ", $out);
+        
+    }
+    
     /**
      * Render markup for pager
      *
@@ -414,17 +536,17 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * @return string
      */
     private function renderPager($links, $page, $pages) {
-
+        
         if ($pages < 2) return;
-
+        
         // convert GET params to string
         $get = "";
         foreach ($this->input->get as $key => $value) {
             if ($key != "page" && $value != "") {
-                $get .= "&".urlencode($key)."=".urlencode($value);
+                $get .= "&amp;" . urlencode($key) . "=" . urlencode($value);
             }
         }
-
+        
         // calculate start and end points
         $start = 1;
         $end = $pages;
@@ -438,18 +560,18 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 if ($start < 1) $start=1;
             }
         }
-
+        
         // generate markup
         $out = "<ul class='MarkupPagerNav MarkupPagerNavCustom'>";
         if ($start > 1) {
-            $out .= "<li><a href='./?page=1$get'><span>1</span></a></li>";
+            $out .= "<li><a href='./?page=1{$get}'><span>1</span></a></li>";
             if ($start > 2) {
                 $out .= "<li class='MarkupPagerNavSeparator'>&hellip;</li>";
             }
         }
         for ($i = $start; $i<=$pages; ++$i) {
-            $here = ($page == $i) ? " class='MarkupPagerNavOn'" : "";
-            $out .= "<li$here><a href='./?page=$i$get'><span>$i</span></a></li>";
+            $here = $page == $i ? " class='MarkupPagerNavOn'" : "";
+            $out .= "<li{$here}><a href='./?page={$i}{$get}'><span>{$i}</span></a></li>";
             if ($pages > $links && $i == $end && $i < $pages) {
                 if ($pages-$i > 1) {
                     $out .= "<li class='MarkupPagerNavSeparator'>&hellip;</li>";
@@ -461,44 +583,46 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $out .= "</ul>";
         
         return $out;
-
+        
     }
-
+    
     /**
      * Render markup for result filter UI
      *
      * @return string 
      */
     private function renderFilters() {
-
+        
         $markup = "";
-
-        // Was login attempt successful?
+        
+        // was login attempt successful?
         $options = array(
             __("All login attempts"),
             __("Successful login attempts") => "1",
             __("Unsuccessful login attempts") => "0",
         );
         $markup .= $this->renderSelect('login_was_successful', $options);
-
-        // Username
+        
+        // username
         $options = array();
         $login = $this->input->get->login_was_successful;
-        $where = ($login == "1" || $login == "0") ? " WHERE login_was_successful = $login" : "";
+        $where = ($login == "1" || $login == "0") ? " WHERE login_was_successful = {$login}" : "";
         $sql = "SELECT DISTINCT username 
                 FROM {$this->table_name}
-                $where 
+                {$where} 
                 ORDER BY username DESC";
-        $result = $this->db->query($sql);
-        if (!$result->num_rows || $result->num_rows > 1) {
+        $stmt = $this->database->prepare($sql);
+        $stmt->execute();
+        $rowCount = $stmt->rowCount();
+        if (!$rowCount || $rowCount > 1) {
             $options[] = __("by any user");
         }
-        while ($row = $result->fetch_assoc()) {
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $key = sprintf(__("by %s"), $row['username']); // by %s // %s will be replaced run-time by username
             $options[$key] = $row['username'];
         }
         $markup .= $this->renderSelect('username', $options);
-
+        
         // Real/removed/nonexistent users
         $options = array(
             __("whether or not user really exists"),
@@ -521,28 +645,32 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             
         // Date range
         $disabled_title = __("Not relevant in this context");
-        $date_from = ($this->input->get->date_from) ? date('d.m.Y', strtotime($this->input->get->date_from)) : '';
-        $date_until = ($this->input->get->date_until) ? date('d.m.Y', strtotime($this->input->get->date_until)) : '';
+        $date_from = $this->input->get->date_from ? date('d.m.Y', strtotime($this->input->get->date_from)) : '';
+        $date_until = $this->input->get->date_until ? date('d.m.Y', strtotime($this->input->get->date_until)) : '';
         $input = $this->modules->get("InputfieldText");
-        $markup .= "<input type='text'"
-                 . " value='$date_from'"
+        $markup .= "<div class='filter no-icon'>"
+                 . "<input type='text'"
+                 . " value='{$date_from}'"
                  . " size='10'"
                  . " data-maxdate='+0D'"
                  . " data-dateformat='dd.mm.yy'"
                  . " name='date_from'"
-                 . " data-disabled-title='$disabled_title'"
-                 . " class='loginhistory-datepicker'"
+                 . " data-disabled-title='{$disabled_title}'"
+                 . " class='log-datepicker'"
                  . " />"
+                 . "</div>"
                  . " .. "
+                 . "<div class='filter no-icon'>"
                  . "<input type='text'"
-                 . " value='$date_until'"
+                 . " value='{$date_until}'"
                  . " size='10'"
                  . " data-maxdate='+0D'"
                  . " data-dateformat='dd.mm.yy'"
                  . " name='date_until'"
-                 . " class='loginhistory-datepicker'"
-                 . " />";
-
+                 . " class='log-datepicker'"
+                 . " />"
+                 . "</div>";
+        
         if ($markup) {
             $form = $this->modules->get('InputfieldForm');
             $form->attr('id', 'filters');
@@ -558,7 +686,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         }
         
     }
-
+    
     /**
      * Render markup for select element
      *
@@ -568,32 +696,32 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * @return string
      */
     private function renderSelect($name, array $options, array $settings = array()) {
-
+        
         if (!$name) return;
-
+        
         $disabled = "";
         if (count($options) < 2) {
             $disabled = " disabled='disabled' class='disabled'";
         }
-
+        
         $attrs = "";
         if (isset($settings['attrs'])) {
-            foreach ($settings['attrs'] as $k => $v) $attrs .= " $k='$v'";
+            foreach ($settings['attrs'] as $k => $v) $attrs .= " {$k}='{$v}'";
         }
-
+        
         $markup = "";
         foreach ($options as $key => $option) {
             $value = $key ? $option : '';
             $text = !is_numeric($key) ? $key : $option;
             if (isset($settings['translate'])) $text = __($text);
-            $selected = ($this->input->get->$name == $value) ? ' selected="selected"' : '';
-            $markup .= "<option$selected value='$value'>$text</option>";
+            $selected = $this->input->get->$name == $value ? ' selected="selected"' : '';
+            $markup .= "<option{$selected} value='{$value}'>{$text}</option>";
         }
-
-        return "<select name='$name'$disabled$attrs>$markup</select>";
-
+        
+        return "<div class='filter'{$disabled}><select name='{$name}'{$disabled}{$attrs}>{$markup}</select></div>";
+        
     }
-
+    
     /**
      * Render human readable view of browser / platform information
      *
@@ -602,63 +730,64 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * @return string
      */
     private function renderBrowserInfo($user_agent = null, $user_agent_features = null) {
-
+        
         // user agent string is required
         if (!$user_agent) return false;
-
+        
         // init vars
         $markup = "";
         $browser = $this->get_browser_alt($user_agent);
-        $features = ($user_agent_features) ? json_decode($user_agent_features) : null;
-
+        $class = $browser->device ? " icon-{$browser->device}" : "";
+        $features = $user_agent_features ? json_decode($user_agent_features) : null;
+        
         // basic information from user agent string
         $markup .= "<tr><th>" . __("Browser") . "</th><td>{$browser->browser} {$browser->version}</td></tr>";
         $markup .= "<tr><th>" . __("Platform") . "</th><td>{$browser->platform}</td></tr>";
         $markup .= "<tr id='device-type'><th>" . __("Device Type") . "</th><td>{$browser->device}</td></tr>";
-
+        
         if ($features) {
-
+            
             // note: since feature detection is implemented with javascript, these will not be available
             // without proper js support!
-
+            
             // escape values (just a precaution)
             foreach ($features as &$feature) $feature = htmlentities($feature);
-
+            
             // javascript support
             $markup .= "<tr><th>JavaScript</th><td>";
             if (isset($features->javascript) && $features->javascript) $markup .= __("Enabled");
             else $markup .= __("Disabled");
             $markup .= "</td></tr>";
-
+            
             // flash support
             $markup .= "<tr><th>Flash</th><td>";
             if (isset($features->flash) && $features->flash) $markup .= __("Enabled");
             else $markup .= __("Disabled");
             $markup .= "</td></tr>";
-
+            
             // screen size
             $markup .= "<tr><th>" . __("Screen") . "</th><td>";
             if (isset($features->screen) && $features->screen) $markup .= $features->screen;
             else $markup .= __("unidentified");
             $markup .= "</td></tr>";
-
+            
             // window size
             $markup .= "<tr><th>" . __("Window") . "</th><td>";
             if (isset($features->window) && $features->window) $markup .= $features->window;
             else $markup .= __("unidentified");
             $markup .= "</td></tr>";
-
+            
         } else {
-
+            
             // javascript-dependent feature checking has failed
             $markup .= "<tr><th>JavaScript</th><td>" . __("Disabled") . "</td></tr>";
-
+            
         }
         
-        return "<table class='user-agent'>$markup</table>";
-
+        return "<table class='details{$class}'>{$markup}</table>";
+        
     }
-
+    
     /**
      * Simplified replacement for PHP's native get_browser()
      *
@@ -670,9 +799,9 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * @return stdClass|null
      */
     private function get_browser_alt($user_agent = null) {
-
+        
         if (!$user_agent) return null;
-
+        
         // empty container object for browser info
         $b = new stdClass();
         $b->browser = __("unknown");
@@ -686,7 +815,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // very rough device type detection
         if (preg_match("/iPad|Tablet|; GT-/i", $user_agent)) $b->device = __("tablet");
         else if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $b->device = __("mobile");
-
+        
         // identify platform
         if (preg_match("/\(([a-zA-Z0-9\.;:\/\-_ ]+)\)/", $user_agent, $match)) {
             if (strstr($match[1], "Windows")) {
@@ -694,41 +823,41 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             } else {
                 $b->platform = strtok($match[1], ";");
                 if (strstr($match[1], "Android")) {
-                    $b->platform = (preg_match("/Android[ 0-9\.]*/", $match[1], $match)) ? $match[0] : "Android";
+                    $b->platform = preg_match("/Android[ 0-9\.]*/", $match[1], $match) ? $match[0] : "Android";
                 }
             }
         }
-
+        
         // identify version number (mostly for Safari and Opera)
         if (preg_match("/version\/([0-9.]*)/i", $user_agent, $match)) {
             $b->version = $match[1];
         }
-
+        
         // identifiable browser strings
         $browsers = array(
             'firefox', 'msie', 'opera', 'chrome', 'safari', 'mozilla', 'seamonkey', 'konqueror', 'netscape',
             'gecko', 'navigator', 'mosaic', 'lynx', 'amaya', 'omniweb', 'avant', 'camino', 'flock', 'aol'
         );
-
+        
         // identify current browser
         foreach($browsers as $browser) {
-            if (preg_match("/([a-z]*?[ ]?$browser)[\/ ]?([0-9.]*)/i", $user_agent, $match)) {
+            if (preg_match("/([a-z]*?[ ]?{$browser})[\/ ]?([0-9.]*)/i", $user_agent, $match)) {
                 $b->browser = $match[1];
                 if (!$b->version) $b->version = $match[2];
                 @list($b->majorver, $b->minorver, $b->revision) = explode('.', $b->version);
                 break;
             }
         }
-
+        
         // special case: android browser reports itself as mobile safari
         if (strpos($b->platform, "Android") !== false && $match[1] == "Mobile Safari") {
             $b->browser = "Android Browser";
         }
-
+        
         return $b;
-
+        
     }
-
+    
     /**
      * Called only when this module is installed
      *
@@ -736,26 +865,26 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      *
      */
     public function ___install() {
-
+        
         // create a page for this module
         $page = new Page();
         $page->template = 'admin';
         $page->name = self::PAGE_NAME; 
         $page->process = $this; 
-
+        
         // insert page under setup at admin
         $page->parent = $this->pages->get($this->config->adminRootPageID)->child('name=setup');
-
+        
         // make page title match module title
         $info = self::getModuleInfo();
         $page->title = $info['title'];
-
+        
         // save the page
         $page->save();
-
+        
         // tell user that we've created a new page
         $this->message("Created Page: {$page->path}"); 
-
+        
         // create login-history permission
         $permission = $this->permissions->get("login-history");
         if (!$permission->id) {
@@ -765,9 +894,9 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $permission->save();
             $this->message("Created Permission: {$permission->name}");
         }
-
+        
     }
-
+    
     /**
      * Called only when this module is uninstalled
      *
@@ -775,25 +904,25 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      *
      */
     public function ___uninstall() {
-
+        
         // find the page we installed, locating it by the process field (which has the module ID)
         // it would probably be sufficient just to locate by name, but this is just to be extra sure.
         $moduleID = $this->modules->getModuleID($this); 
-        $page = $this->pages->get("template=admin, process=$moduleID, name=" . self::PAGE_NAME); 
-
+        $page = $this->pages->get("template=admin, process={$moduleID}, name=" . self::PAGE_NAME); 
+        
         if($page->id) {
             // if we found the page, let the user know and delete it
             $this->message("Deleting Page: {$page->path}"); 
             $page->delete();
         }
-
+        
         // delete login-history permission
         $permission = $this->permissions->get("login-history");
         if ($permission->id) {
             $this->message("Deleting Permission: {$permission->name}");
             $permission->delete();
         }
-
+        
     }
     
 }

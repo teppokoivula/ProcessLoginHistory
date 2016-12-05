@@ -1,45 +1,75 @@
 Process Login History Module
 ============================
 
-Login history module for ProcessWire CMS/CMF.
-Copyright (c) 2012-2013 Teppo Koivula
+Login History module for ProcessWire CMS/CMF.
+Copyright (c) 2012-2016 Teppo Koivula
 
 This module keeps track of login attempts to your site, both successful and
-unsuccessful (tracking unsuccessful logins is off by default) in order to offer
-better understanding about users' activity and environments they use / favor;
-browsers, browser features such as Flash / JavaScript, devices, screen and
-window sizes.
+unsuccessful (though tracking unsuccessful logins is off by default) in order
+to offer better understanding about users' activity and environments they use
+and/or favor; browsers, browser features such as Flash / JavaScript, devices,
+screen and window sizes, etc.
 
-Please note that there are solutions much better for tracking general site
-usage available -- such as Google Analytics. This module isn't intended to
-replace those, it just offers slightly closer integration with specific
-ProcessWire feautures.
+Please note that there are much better solutions -- such as Google Analytics --
+for tracking general site usage. This module isn't intended to replace those,
+it just offers slightly closer integration with specific ProcessWire features.
+
+## Requirements
+
+The master branch of this module requires ProcessWire 2.3.1+. If you're running
+an earlier version of ProcessWire you probably should consider updating it, but
+if that's not an option, please check out the legacy branch instead:
+
+https://github.com/teppokoivula/ProcessLoginHistory/tree/legacy
+
+Automatic cleanup (which is recommended) requires that you install the LazyCron
+module. While said modue is bundled with the core package, it is not installed
+by default. Without automatic cleanup your database can eventually become slow
+as more and more changelog data gets stored in it.
 
 ## Installing
 
-Copy ProcessLoginHistory folder to your /site/modules/, go to Admin > Modules,
-hit "Check for new modules" and install Login History. Process Login History
-Hooks will be installed automatically with Process Login History.
+This module is installed just like any other ProcessWire module: copy or clone
+the directory containing this module to your /site/modules/ directory, log in,
+go to Admin > Modules, click "Check for new modules", and install "Login
+History".
 
-Note: this module requires ProcessWire 2.2. Automatic cleanup feature requires
-LazyCron module, which is included in ProcessWire core distribution. Automatic
-cleanup isn't required for this module to work but it's highly recommended to
-avoid cluttering custom database table used by Process Login History with
-unnecessary / unwanted old rows.
+Process Login History Hooks will be automatically installed along with the main
+module Process Login History. Installing Process Login History RSS is completely
+optional: if installed, it provides you with a publicly viewable RSS feed of the
+login history. More details under heading "Login History RSS feed".
 
 ## How to use
 
-During install a new Login History page is created, placed by default under
-Admin > Settings. From there you'll find information about each login attempt
-since this module was installed. Clicking *more* link at the end of each row
-reveals more information about this particular login attempt / user who
-initiated it.
+When you install this module, it creates a new page into the Admin called
+Login History (Settings > Login History). This page contains a list of login
+attempts to your site since the moment this module was installed. By clicking
+the *more* link next to each row reveals more information about that particular
+login attempt.
+
+In order to access the Login History page, users need to a) be authenticated and
+b) have a role with the "login-history" permission *or* have the superuser role.
+While the login-history permission will be added automatically when this module
+is installed, it needs to be given to any applicable roles manually.
+
+### Login History RSS feed
+
+This module provides two types of RSS feeds: one that can be accessed only by
+authenticated users via the Login History page (/setup/login-history/rss/), and
+other which can be enabled by installing the optional Process Login History RSS
+module, typing in a key to it's config settings, and accessing the feed via URL
+such as this: http://example.com/process-login-history-rss.xml?key=1234567890.
+
+Since the latter feed can be accessed via a public URL, please make sure that
+your key is as difficult to guess as possible (and never use key 1234567890).
+If you are unsure about whether you really need this feature, please leave
+the Process Login History RSS module uninstalled.
 
 ## Settings
 
-This module provides couple of settings you should be aware of. Since this
-module actually consists of two modules, one of which handles view side and
-other data collection, both have their own settings:
+This module contains a bunch of settings you should be aware of. Settings can
+be defined via ProcessWire's native module configuration screen, and each of
+the bundled module's has it's own settings.
 
 ### Process Login History
 
@@ -68,27 +98,30 @@ other data collection, both have their own settings:
 * Defines if attempts to login as nonexisting users should be logged.
 * Default: false
 
+### Process Login History RSS
+
+**Key**
+
+* Key required to view the public login history RSS feed; if omitted, the feed
+  won't be available. Please note that the key has to be at least 10 characters
+  long.
+* Default: null (feed not available)
+
 ## Roadmap
 
 These are new features, fixes and improvements to current feature set planned
 for later releases:
 
-**1.3**
+**1.4**
 
 * support for PHP's native get_browser()
 * support for Browser Capabilities PHP Project / phpbrowscap
   (https://github.com/GaretJax/phpbrowscap)
 * OS (platform) version sniffing
 
-**1.4**
+**1.5**
 
 * usage statistics, possibly even graphs
-
-## Icons
-
-Icons used by this module are part of Blueberry Basic icon set, which is made
-freely available for any kind of commercial or non-commercial projects by
-Icojam. See http://www.icojam.com/blog/?p=259 for more information.
 
 ## License
 

@@ -1,97 +1,313 @@
-/* ProcessLoginHistory */
+/* --- filters form --- */
 
 form#filters select,
-form#filters .loginhistory-datepicker {
-    margin: 0 1% 0 0;
+form#filters .log-datepicker {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background: transparent;
+    border: 0;
+    position: relative;
+    padding: 0.5em 2.25em 0.5em 1em;
+    cursor: pointer;
 }
 
-form#filters .loginhistory-datepicker {
+form#filters select::-ms-expand {
+    display: none;
+}
+
+form#filters select:last-child,
+form#filters .log-datepicker {
     margin-right: 0;
 }
 
-form#filters select.disabled,
-form#filters .loginhistory-datepicker.disabled {
+form#filters div.filter.disabled {
     opacity: 0.5;
 }
 
-ul.MarkupPagerNavCustom li.MarkupPagerNavSeparator,
-ul.MarkupPagerNavCustom li a {
-    margin-right: 3px;
+form#filters div.filter.disabled input {
+    cursor: default;
 }
 
-table.history em {
-    color: #bbb;
+form#filters div.filter {
+    display: inline-block;
+    border-radius: 2px;
+    position: relative;
+    border: 1px solid rgba(0,0,0,0.25);
+    background: #fafafa;
+    background: linear-gradient(to bottom, #fafafa, #fff);
+    margin: 0.2em 0;
 }
 
-table.history b {
-    font-size: 0.65em;
+form#filters div.filter:not(.no-icon) {
+    margin-right: 1%;
 }
 
-table.history tr.open td {
+form#filters div.filter:not(.no-icon)::before {
+    font-family: FontAwesome;
+    padding: 0.4em 0 0 0;
+    position: absolute;
+    content: '\f0d7';
+    right: 0.75em;
+}
+
+#ui-datepicker-div {
+    font-size: 12px;
+    line-height: 14px;
+}
+
+/* --- log table --- */
+
+table.log a.tag,
+table.log a.tag:hover {
+    color: #fff;
+    padding: 4px 10px;
+    margin: 0 2px 0 0;
+    border-radius: 2px;
+    font-weight: normal;
+    background: #6195ba;
+    display: inline-block;
+    transition: opacity 0.2s;
+}
+
+table.log a.tag.status-no {
+    background: #dd2680;
+}
+
+table.log a.tag.status-yes {
+    background: #52a929;
+}
+
+table.log a.tag::before {
+    font-family: FontAwesome;
+    display: inline-block;
+    opacity: 0.6;
+    width: 1.2em;
+}
+
+table.log a.tag.selected::before {
+    content: '\f046';
+}
+
+table.log a.tag:not(.selected)::before {
+    content: '\f096';
+}
+
+table.log a.tag:hover {
+    opacity: 0.8;
+}
+
+table.log span {
+    display: inline-block;
+}
+
+table.log span:not(.user):not(.hidden) {
+    padding: 4px 10px;
+}
+
+table.log tr {
+    line-height: 2em;
+    display: table-row;
+    border-bottom: 1px solid #eaf0f2;
+}
+
+table.log tr td,
+table.log tr th {
+    border: 0 !important;
+    vertical-align: middle;
+}
+
+table.log tr th:last-child {
+    width: 100px;
+}
+
+table.AdminDataList.log tr td .user {
+    font-weight: normal;
+}
+
+table.AdminDataList.log tr td .user::before {
+    font-family: FontAwesome;
+    padding-right: 0.5em;
+}
+
+table.AdminDataList.log tr td .user::before {
+    content: '\f007';
+}
+
+table.AdminDataList.log tr td .user.deleted::before {
+    content: '\f235';
+    color: #8a8a8a;
+}
+
+table.AdminDataList.log tr td .user.guest::before {
+    content: '\f21b';
+    color: #8a8a8a;
+}
+
+table.log tr.open td {
     border-bottom: 0;
 }
 
-table.history tr.more td {
+table.log a.more {
+    cursor: pointer;
+    user-select: none;
+}
+
+table.log a.more::after {
+    font-family: FontAwesome;
+    padding-left: 0.5em;
+    content: '\f107';
+}
+
+table.log tr.open a.more::after {
+    content: '\f106';
+}
+
+table.log tr.more tr {
+    line-height: 1.75em;
+}
+
+table.log tr.more td {
     border: 0;
 }
 
-table.history tr.more div {
-    color: #6195ba;
+table.log tr.more > td {
+    padding: 0;
+}
+
+table.log tr.more div {
+    margin: 1em 0;
+    color: #2f4248;
     font-size: 0.85em;
-    border-radius: 5px;
-    border: 1px solid #dbe3e5;
-    padding: 8px 10px 14px 55px;
-    text-shadow: 1px 1px 0 #f1f8fa;
-    background: url('img/desktop.png') 10px 10px no-repeat #e9eff1;
+    border-radius: 2px;
+    position: relative;
+    background: #e9eff1;
+    border: 1px solid #d7e2e6;
+    padding: 1.25em 1em 1.25em 6em;
 }
 
-table.history tr#device-type td:first-letter {
-    text-transform: uppercase;
-}
-
-table.history tr.more.mobile-device div {
-    background-image: url('img/mobile.png');
-}
-
-table.history tr.more.tablet-device div {
-    background-image: url('img/tablet.png');
-}
-
-table.history tr.more table {
-    margin: 0;
-}
-
-.content table.history tr.more table th,
-.content table.history tr.more table td {
+table.log tr.more:hover td,
+table.log tr.more:hover th {
     background: transparent;
-    padding-right: 20px;
+}
+
+table.log tr.more table::before {
+    top: 0.5em;
+    left: 0.5em;
+    color: #2f4248;
+    font-size: 3em;
+    content: '\f059';
+    position: absolute;
+    font-family: FontAwesome;
+}
+
+table.log tr.more table.icon-desktop::before {
+    content: '\f108';
+}
+
+table.log tr.more table.icon-tablet::before {
+    content: '\f10a';
+}
+
+table.log tr.more table.icon-mobile::before {
+    content: '\f10b';
+}
+
+table.log tr.more table {
+    margin: 0;
+    width: 100%;
+    display: table;
+}
+
+table.log tr.more table tr {
+    border-bottom: 1px solid #dcdfe0;
+}
+
+table.log tr.more table tr:last-child {
+    border-bottom: 0;
+}
+
+table.log tr.more table th,
+table.log tr.more table td {
+    padding: 0.5em 1em;
     border-bottom: 0;
     font-size: 1em;
 }
 
-table.history tr.more table th:hover {
+table.log tr.more table th {
     color: #777 !important;
     text-decoration: none;
     cursor: auto;
+    width: 20%;
 }
 
-table.history a.remove {
+table.log tr.more table th::after {
+    content: '';
+}
+
+table.log thead th:nth-last-child(2),
+table.log a.action {
     visibility: hidden;
 }
 
-table.history tr:hover a.remove {
+@media only screen and (max-width: 767px) {
+    table.AdminDataTableResponsive.log thead th:nth-child(4),
+    table.AdminDataTableResponsive.log a.action {
+        visibility: visible;
+        display: inline-block;
+    }
+    table.AdminDataTableResponsive.log a.tag,
+    table.AdminDataTableResponsive.log strong {
+        margin-bottom: 4px;
+    }
+}
+
+table.log tr:hover a.action {
     visibility: visible;
     opacity: 0.33;
 }
 
-table.history tr.open a.remove,
-table.history tr a.remove:hover {
+table.log tr.open a.action,
+table.log tr a.action:hover {
     visibility: visible;
     opacity: 1;
 }
 
-table.history span {
+table.log span.hidden {
     display: none;
+}
+
+/* --- misc --- */
+
+.content ul.MarkupPagerNavCustom li.MarkupPagerNavSeparator,
+.content ul.MarkupPagerNavCustom li a {
+    margin-right: 3px;
+}
+
+#info h2 i {
+    font-size: 1em !important;
+    margin-left: 0.5em;
+}
+
+#feeds li {
+    display: inline-block;
+    margin-right: 1em;
+}
+
+#feeds li:not(:last-child)::after {
+    content: '|';
+    margin-left: 1em;
+    opacity: 0.25;
+}
+
+#feeds li:last-child {
+    margin-right: 0;
+}
+
+#feeds a::before {
+    font-family: FontAwesome;
+    padding: 0 0.5em 0 0;
+    content: '\f09e';
 }
 
 /* ProcessUser */
