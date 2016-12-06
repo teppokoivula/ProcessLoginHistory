@@ -112,15 +112,10 @@ the bundled module's has it's own settings.
 These are new features, fixes and improvements to current feature set planned
 for later releases:
 
-**1.4**
-
 * support for PHP's native get_browser()
 * support for Browser Capabilities PHP Project / phpbrowscap
   (https://github.com/GaretJax/phpbrowscap)
 * OS (platform) version sniffing
-
-**1.5**
-
 * usage statistics, possibly even graphs
 
 ## License
