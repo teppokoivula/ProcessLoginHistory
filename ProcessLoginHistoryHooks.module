@@ -25,7 +25,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 120,
+            'version' => 121,
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -219,7 +219,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         // it could still be that of a proxy. Proxies often use X-Forwarded-For
         // header to identify original source, but headers are unreliable (easy
         // to fake) and thus we wouldn't be able to trust it here anyway.
-        $ip_address = $this->log_ip_addresses ? "'{$_SERVER['REMOTE_ADDR']}'" : "NULL";
+        $ip_address = $this->log_ip_addresses ? $_SERVER['REMOTE_ADDR'] : null;
         
         // insert new row into database
         $sql = "INSERT INTO " . self::TABLE_NAME . " " .
