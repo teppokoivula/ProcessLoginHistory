@@ -13,7 +13,7 @@
  *
  * @copyright 2012-2016 Teppo Koivula
  * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License, version 2
- * @todo consiider recording logouts too
+ * @todo consider recording logout actions too
  */
 class ProcessLoginHistory extends Process implements ConfigurableModule {
     
