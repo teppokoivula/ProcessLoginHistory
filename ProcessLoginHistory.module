@@ -28,7 +28,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => 130,
+            'version' => '1.4.0',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -321,6 +321,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             "when",
             "date_from",
             "date_until",
+            "ip_address",
         );
         
         // Possible values for 'when' filter
@@ -451,21 +452,32 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         
         // basic user information; if user_id is set user exists or at least existed at
         // the time of login attempt (still need to check if that's currently true though)
+        $selected = $this->input->get->username == $row['username'] ? ' selected' : '';
+        $query_string = htmlentities(http_build_query(array_merge($this->input->get->getArray(), array('username' => $selected ? null : $row['username']))));
+        $filter = " <a class='ajax action{$selected}' href='?{$query_string}'><i class='fa fa-filter'></i></a>";
         if (!$row['user_id']) {
             // nonexistent user, no need to show an edit link
-            $data[] = "<span class='user guest' title='" . __("nonexistent") . "'>{$row['username']}</span>";
+            $data[] = "<span class='user guest' title='" . __("nonexistent") . "'>{$row['username']}</span>{$filter}";
         } else {
             // check if user still exists and if yes, provide an edit link
-            $user = $this->users->get($row['user_id']);
+            $user = $this->users->get($row['username']);
             if ($user->id) {
-                $data[] = "<a class='user' href='{$this->config->urls->admin}access/users/edit/?id={$user->id}'>{$user->name}</a>";
+                $data[] = "<a class='user' href='{$this->config->urls->admin}access/users/edit/?id={$user->id}'>{$user->name}</a>{$filter}";
             } else {
-                $data[] = "<span class='user deleted' title='" . __("deleted") . "'>{$row['username']}</span>";
+                $data[] = "<span class='user deleted' title='" . __("deleted") . "'>{$row['username']}</span>{$filter}";
             }
         }
         
         // IP address
-        if ($this->log_ip_addresses) $data[] = $row['ip_address'];
+        if ($this->log_ip_addresses) {
+            if ($row['ip_address']) {
+                $selected = $this->input->get->ip_address == $row['ip_address'] ? ' selected' : '';
+                $query_string = htmlentities(http_build_query(array_merge($this->input->get->getArray(), array('ip_address' => $selected ? null : $row['ip_address']))));
+                $data[] = "<a class='ajax tag ip_address{$selected}' href='?{$query_string}'>{$row['ip_address']}</a>";
+            } else {
+                $data[] = null;
+            }
+        }
         
         // status of login attempt
         $status = __("No");
