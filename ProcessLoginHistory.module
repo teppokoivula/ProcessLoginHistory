@@ -28,7 +28,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.4.0',
+            'version' => '1.4.1',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -265,7 +265,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $rss = new SimpleXMLElement('<rss/>');
         $rss->addAttribute('version', '2.0');
         
-        // create channel eelment
+        // create channel element
         $channel = $rss->addChild('channel');
         $channel->addChild('title', __('Login History'));
         $channel->addChild('link', $this->input->httpUrl . ($_GET ? '?' . htmlentities($this->input->queryString) : ''));
@@ -518,22 +518,29 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         
         // basic user information; if user_id is set user exists or at least existed at
         // the time of login attempt (still need to check if that's currently true though)
+        $username = "";
         if (!$row['user_id']) {
             // nonexistent user
-            $out[] = $row['username'] . " (" . __("nonexistent") . ")";
+            $username = $row['username'] . " (" . __("nonexistent") . ")";
         } else {
             // check if user still exists and if yes, provide an edit link
             $user = $this->users->get($row['user_id']);
-            $out[] = $user->id ? $user->name : $row['username'] . " (" . __("deleted") . ")";
+            $username = $user->id ? $user->name : $row['username'] . " (" . __("deleted") . ")";
         }
         
-        // IP address
-        if ($this->log_ip_addresses) $out[] = $row['ip_address'];
-        
         // status of login attempt
-        $status = __("No");
-        if ($row['login_was_successful']) $status = __("Yes");
+        $status = "";
+        if ($row['login_was_successful']) {
+            $status = sprintf(__("Succesful login for %s"), $username); // %s will be replaced run-time by username
+        } else {
+            $status = sprintf(__("Failed login attempt for %s"), $username); // %s will be replaced run-time by username
+        }
         $out[] = $status;
+        
+        // IP address
+        if ($this->log_ip_addresses) {
+            $out[] = sprintf(__("from %s"), $row['ip_address']); // %s will be replaced run-time by IP address
+        }
         
         return implode(" ", $out);
         
@@ -630,7 +637,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $options[] = __("by any user");
         }
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $key = sprintf(__("by %s"), $row['username']); // by %s // %s will be replaced run-time by username
+            $key = sprintf(__("by %s"), $row['username']); // %s will be replaced run-time by username
             $options[$key] = $row['username'];
         }
         $markup .= $this->renderSelect('username', $options);
