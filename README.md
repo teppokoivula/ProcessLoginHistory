@@ -2,7 +2,7 @@ Process Login History Module
 ============================
 
 Login History module for ProcessWire CMS/CMF.
-Copyright (c) 2012-2016 Teppo Koivula
+Copyright (c) 2012-2018 Teppo Koivula
 
 This module keeps track of login attempts to your site, both successful and
 unsuccessful (though tracking unsuccessful logins is off by default) in order
