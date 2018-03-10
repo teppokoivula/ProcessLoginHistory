@@ -175,7 +175,7 @@ table.log tr.more > td {
     padding: 0;
 }
 
-table.log tr.more div {
+table.log tr.more > td > div {
     margin: 1em 0;
     color: #2f4248;
     font-size: 0.85em;
@@ -186,31 +186,22 @@ table.log tr.more div {
     padding: 1.25em 1em 1.25em 6em;
 }
 
+table.log tr.more > td > div .icons {
+    text-align: center;
+    position: absolute;
+    left: 1.25em;
+}
+
+table.log tr.more > td > div .icons .fa {
+    font-size: 3em !important;
+    margin: 0 0 0.5em 0;
+    display: block;
+    opacity: 0.5;
+}
+
 table.log tr.more:hover td,
 table.log tr.more:hover th {
     background: transparent;
-}
-
-table.log tr.more table::before {
-    top: 0.5em;
-    left: 0.5em;
-    color: #2f4248;
-    font-size: 3em;
-    content: '\f059';
-    position: absolute;
-    font-family: FontAwesome;
-}
-
-table.log tr.more table.icon-desktop::before {
-    content: '\f108';
-}
-
-table.log tr.more table.icon-tablet::before {
-    content: '\f10a';
-}
-
-table.log tr.more table.icon-mobile::before {
-    content: '\f10b';
 }
 
 table.log tr.more table {

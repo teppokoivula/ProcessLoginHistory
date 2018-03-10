@@ -28,7 +28,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'http://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.4.1',
+            'version' => '1.4.3',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -581,27 +581,37 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         }
         
         // generate markup
-        $out = "<ul class='MarkupPagerNav MarkupPagerNavCustom'>";
+        $out = "";
+        $pager_config = $this->config->MarkupPagerNav ?: array(
+            'currentItemClass' => 'uk-active MarkupPagerNavOn',
+            'separatorItemLabel' => '<span>&hellip;</span>',
+            'separatorItemClass' => 'uk-disabled MarkupPagerNavSeparator',
+            'listMarkup' => "<ul class='uk-pagination MarkupPagerNav'>{out}</ul>",
+        );
         if ($start > 1) {
             $out .= "<li><a href='./?page=1{$get}'><span>1</span></a></li>";
             if ($start > 2) {
-                $out .= "<li class='MarkupPagerNavSeparator'>&hellip;</li>";
+                $out .= "<li class='{$pager_config['separatorItemClass']}'>{$pager_config['separatorItemLabel']}</li>";
             }
         }
         for ($i = $start; $i<=$pages; ++$i) {
-            $here = $page == $i ? " class='MarkupPagerNavOn'" : "";
+            $here = $page == $i ? " class='{$pager_config['currentItemClass']}'" : "";
             $out .= "<li{$here}><a href='./?page={$i}{$get}'><span>{$i}</span></a></li>";
             if ($pages > $links && $i == $end && $i < $pages) {
                 if ($pages-$i > 1) {
-                    $out .= "<li class='MarkupPagerNavSeparator'>&hellip;</li>";
+                    $out .= "<li class='{$pager_config['separatorItemClass']}'>{$pager_config['separatorItemLabel']}</li>";
                 }
                 $i = $pages-1;
                 if ($i < $end) $i = $end+1;
             }
         }
-        $out .= "</ul>";
+         $out = str_replace(
+            '{out}',
+            $out,
+            $pager_config['listMarkup']
+        );
         
-        return $out;
+        return "<div class='MarkupPagerNavCustom'>{$out}</div>";
         
     }
     
@@ -756,7 +766,6 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // init vars
         $markup = "";
         $browser = $this->get_browser_alt($user_agent);
-        $class = $browser->device ? " icon-{$browser->device}" : "";
         $features = $user_agent_features ? json_decode($user_agent_features) : null;
         
         // basic information from user agent string
@@ -803,7 +812,33 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             
         }
         
-        return "<table class='details{$class}'>{$markup}</table>";
+        // icons
+        $icon_str = "";
+        $platform_icons = array(
+            'apple',
+            'windows',
+            'android',
+            'linux',
+        );
+        $browser_icons = array(
+            'chrome',
+            'firefox',
+            'internet-explorer',
+            'edge',
+            'safari',
+            'opera',
+        );
+        $icons = array_filter(array(
+            $browser->device ?: "question-circle",
+            $browser->platform == "Macintosh" ? "apple" : (in_array(mb_strtolower($browser->platform), $platform_icons) ? mb_strtolower($browser->platform) : ""),
+            $browser->browser == "msie" ? "internet-explorer" : (in_array(mb_strtolower($browser->browser), $browser_icons) ? mb_strtolower($browser->browser) : ""),
+        ));
+        if (count($icons)) {
+            array_walk($icons, function(&$i) { $i = $i ? "<i class='fa fa-{$i}'></i>" : ""; });
+            $icon_str = "<div class='icons'>" . implode($icons) . "</div>";
+        }
+        
+        return "{$icon_str}<table class='details'>{$markup}</table>";
         
     }
     
@@ -855,13 +890,13 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // identifiable browser strings
         $browsers = array(
             'firefox', 'msie', 'opera', 'chrome', 'safari', 'mozilla', 'seamonkey', 'konqueror', 'netscape',
-            'gecko', 'navigator', 'mosaic', 'lynx', 'amaya', 'omniweb', 'avant', 'camino', 'flock', 'aol'
+            'gecko', 'navigator', 'mosaic', 'lynx', 'amaya', 'omniweb', 'avant', 'camino', 'flock', 'aol',
         );
         
         // identify current browser
         foreach($browsers as $browser) {
             if (preg_match("/([a-z]*?[ ]?{$browser})[\/ ]?([0-9.]*)/i", $user_agent, $match)) {
-                $b->browser = $match[1];
+                $b->browser = trim($match[1]);
                 if (!$b->version) $b->version = $match[2];
                 @list($b->majorver, $b->minorver, $b->revision) = explode('.', $b->version);
                 break;
