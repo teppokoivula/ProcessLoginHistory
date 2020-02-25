@@ -2,7 +2,7 @@ Process Login History Module
 ============================
 
 Login History module for ProcessWire CMS/CMF.
-Copyright (c) 2012-2018 Teppo Koivula
+Copyright (c) 2012-2020 Teppo Koivula
 
 This module keeps track of login attempts to your site, both successful and
 unsuccessful (though tracking unsuccessful logins is off by default) in order
@@ -16,9 +16,9 @@ it just offers slightly closer integration with specific ProcessWire features.
 
 ## Requirements
 
-The master branch of this module requires ProcessWire 2.3.1+. If you're running
-an earlier version of ProcessWire you probably should consider updating it, but
-if that's not an option, please check out the legacy branch instead:
+The master branch of this module requires ProcessWire 3.0+. If you're running
+an earlier version of ProcessWire you probably should consider updating it; if
+that's not an option, please check out the legacy branch instead:
 
 https://github.com/teppokoivula/ProcessLoginHistory/tree/legacy
 
@@ -79,6 +79,13 @@ the bundled module's has it's own settings.
 * See the PHP date function reference for information on how to customize
   this setting: http://www.php.net/manual/en/function.date.php
 * Default: j.n.Y H:i
+
+**User Label Format**
+
+* Defines the label format for users listed on the Login History page
+* You can use page properties and field values from the user template with
+  {field_name} or {property_name} syntax
+* Default: {name}
 
 **Row Limit**
 

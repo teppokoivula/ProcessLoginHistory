@@ -1,4 +1,4 @@
-<?php
+<?php namespace ProcessWire;
 
 /**
  * RSS feed for Process Login History
@@ -7,8 +7,8 @@
  * ProcessLoginHistoryHooks. RSS feeds can be accessed via a pre-defined URL
  * and a key stored within the configuration settings of this module.
  *
- * @copyright 2016 Teppo Koivula
- * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License, version 2
+ * @copyright 2016-2020 Teppo Koivula
+ * @license https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt GNU General Public License, version 2
  */ 
 class ProcessLoginHistoryRSS extends WireData implements Module, ConfigurableModule {
     
@@ -18,17 +18,17 @@ class ProcessLoginHistoryRSS extends WireData implements Module, ConfigurableMod
      * @return array
      */
     public static function getModuleInfo() {
-        return array(
+        return [
             'title' => __('Login History RSS'),
             'summary' => __('Output an RSS feed from Process Login History data'),
-            'href' => 'http://modules.processwire.com/modules/process-login-history/',
+            'href' => 'https://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.0.0',
+            'version' => '1.1.0',
             'singular' => true,
             'autoload' => true,
             'icon' => 'rss',
             'requires' => 'ProcessLoginHistory',
-        ); 
+        ];
     }
     
     /**
@@ -44,7 +44,7 @@ class ProcessLoginHistoryRSS extends WireData implements Module, ConfigurableMod
      * @param array $data
      * @return InputfieldWrapper
      */
-    static public function getModuleConfigInputfields(array $data) {
+    public static function getModuleConfigInputfields(array $data) {
 
         // container for fields
         $fields = new InputfieldWrapper();
@@ -72,7 +72,7 @@ class ProcessLoginHistoryRSS extends WireData implements Module, ConfigurableMod
         $fields->add($field);
 
         return $fields;
-        
+
     }
 
     /**
@@ -96,10 +96,11 @@ class ProcessLoginHistoryRSS extends WireData implements Module, ConfigurableMod
 
     /**
      * Render RSS feed
-     *
      */
     protected function renderRSS() {
-        $this->modules->getModule('ProcessLoginHistory', array('noPermissionCheck' => true))->executeRSS();
+        /** @var ProcessLoginHistory */
+        $loginHistory = $this->modules->getModule('ProcessLoginHistory', ['noPermissionCheck' => true]);
+        $loginHistory->executeRSS();
     }
 
 }
