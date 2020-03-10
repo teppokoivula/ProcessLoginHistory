@@ -105,6 +105,17 @@ the bundled module's has it's own settings.
 * Defines if attempts to login as nonexisting users should be logged.
 * Default: false
 
+**Enable logging of user's IP address?**
+
+* Enables logging IP addresses of users logging in (or attempting to).
+* Default: false
+
+**Give preference to client headers for IP?**
+
+* Enabling this option will use HTTP_CLIENT_IP and HTTP_X_FORWARDED_FOR as the
+  primary methods for getting the IP.
+* Default: false
+
 ### Process Login History RSS
 
 **Key**

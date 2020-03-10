@@ -25,7 +25,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.3.0',
+            'version' => '1.4.0',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -95,6 +95,16 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         $field->label = __("Log IP addresses");
         $field->description = __("Enable logging IP addresses of users logging in (or attempting to)?");
         $field->notes = __("IP addresses can be considered personal data, which is why logging them is not enabled by default.");
+        if (isset($data[$field->name])) $field->checked = "checked";
+        $fields->add($field);
+
+        // give preference to client headers for IP?
+        $field = $modules->get("InputfieldCheckbox");
+        $field->name = "prefer_client_ip";
+        $field->label = __("Give preference to client headers for IP?");
+        $field->description = __("Enabling this option will use HTTP_CLIENT_IP and HTTP_X_FORWARDED_FOR as primary methods for getting the IP.");
+        $field->notes = __("This may be necessary in certain environments, such as when using a load balancer or proxy.");
+        $field->showIf = "log_ip_addresses=1";
         if (isset($data[$field->name])) $field->checked = "checked";
         $fields->add($field);
 
@@ -211,11 +221,8 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             $user_agent_features = null;
         }
 
-        // REMOTE_ADDR is the IP address from which this request came from, but
-        // it could still be that of a proxy. Proxies often use X-Forwarded-For
-        // header to identify original source, but headers are unreliable (easy
-        // to fake) and thus we wouldn't be able to trust it here anyway.
-        $ip_address = $this->log_ip_addresses ? $_SERVER['REMOTE_ADDR'] : null;
+        // grab the IP address from ProcessWire
+        $ip_address = $this->log_ip_addresses ? $this->getIP() : null;
 
         // insert new row into database
         $sql = "INSERT INTO " . self::TABLE_NAME . " " .
@@ -407,6 +414,43 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     public function ___uninstall() {
         $this->message("Deleting Table: " . self::TABLE_NAME);
         $this->database->exec("DROP TABLE IF EXISTS " . self::TABLE_NAME);
+    }
+
+    /**
+     * Get IP address
+     *
+     * Note: this is almost identical to Session::getIP(), except that here we will not use the
+     * Client-IP header.
+     *
+     * @return string IP address
+     */
+    protected function getIP() {
+
+        // Use REMOTE_ADDR with a fallback to localhost.
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+
+        // Check HTTP_X_FORWARDED_FOR in case we're behind a proxy or load balancer.
+        if ($this->prefer_client_ip && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $lb_ip_address = $_SERVER['HTTP_X_FORWARDED_FOR'];
+            if (strpos($lb_ip_address, ',') !== false) {
+                // ELB appends addresses to the list, so the last one should be actual client IP.
+                list($lb_ip_address) = array_reverse(explode(',', $lb_ip_address));
+            }
+            $test = str_replace(array('.', ',', ' '), '', $lb_ip_address);
+            if (ctype_digit("$test")) {
+                $ip_address = $lb_ip_address;
+            }
+        }
+
+        // Allow overriding IP with config option.
+        if (!empty($this->config->sessionForceIP)) {
+            $ip_address = $this->config->sessionForceIP;
+        }
+
+        // Sanitize by converting to and from integer.
+        $ip_address = long2ip(ip2long(trim($ip_address)));
+
+        return $ip_address;
     }
 
 }
