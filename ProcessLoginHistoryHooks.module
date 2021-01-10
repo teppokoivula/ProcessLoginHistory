@@ -208,8 +208,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         if ($user === null) {
             // filter username from event arguments (note: using htmlentities() instead of $sanitizer->pageName() to keep
             // track of broken / strange input values)
-            $name = $event->arguments[0];
-            $username = is_string($name) ? $this->database->escapeStr(htmlentities($event->arguments[0])) : $name->name;
+            $username = $this->database->escapeStr(htmlentities($event->arguments[0]));
 
             // try to get user matching given username
             if (strtolower($username) == $this->sanitizer->pageName($username)) {
