@@ -195,21 +195,38 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         $user_agent_features = [];
         $login_was_successful = 0;
         $user_id = 0;
-        $user = null;
+        $username = null;
 
-        // fetch and filter username from event arguments (using htmlentities() instead of
-        // $sanitizer->pageName() to allow keeping track of broken / strange input values)
-        $username = $this->database->escapeStr(htmlentities($event->arguments[0]));
+        // first event argument may contain User object or username string
+        if ($event->arguments[0] instanceof User) {
+            $login_was_successful = 0;
+            $user = $event->arguments[0];
+            $user_id = $user->id;
+            $username = $user->name;
+        }
 
-        // try to get user matching given username
-        if (strtolower($username) == $this->sanitizer->pageName($username)) {
-            $user = $this->users->get("name=$username");
-            if ($user->id) {
-                $user_id = $user->id;
-                if ($event->return) $login_was_successful = 1;
+        if ($user === null) {
+            // filter username from event arguments (note: using htmlentities() instead of $sanitizer->pageName() to keep
+            // track of broken / strange input values)
+            $name = $event->arguments[0];
+            $username = is_string($name) ? $this->database->escapeStr(htmlentities($event->arguments[0])) : $name->name;
+
+            // try to get user matching given username
+            if (strtolower($username) == $this->sanitizer->pageName($username)) {
+                $user = $this->users->get("name=$username");
+                if ($user->id) {
+                    $user_id = $user->id;
+                }
             }
         }
+
+        // bail out early if there's no user and we're not currently logging login attempts for nonexisting users
         if (!$user->id && !$this->log_nonexistent_users) return;
+
+        // check if the login attempt was successful
+        if ($event->return !== null) {
+            $login_was_successful = 1;
+        }
 
         // user agent features
         if (isset($_POST['flash'])) $user_agent_features['flash'] = 1;
@@ -328,7 +345,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
                 $date_diff = "";
             }
 
-            // was login attempt succesful?
+            // was login attempt successful?
             $status = $this->_("unsuccessful attempt");
             if ($row['login_was_successful']) $status = $this->_("successful attempt");
 
