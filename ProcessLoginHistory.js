@@ -101,13 +101,15 @@ $(document).ready(function() {
     }
 
     // update content via AJAX
+    var $contentContainer = $('#info').parent();
+    var isUikit = $contentContainer.find('.uk-select:first').length > 0;
     var updateXHR;
     var updateContent = function(params) {
         var $spinner = $('#info h2 i.fa-spinner');
         if (!$spinner.length || $spinner.data('params') != params) {
             if ($spinner.length && updateXHR) {
-				updateXHR.abort();
-			}
+                updateXHR.abort();
+            }
             $spinner = $('<i class="fa fa-spinner fa-spin"></i>').data('params', params);
             $('#info h2').append($spinner);
             history.replaceState(null, null, params);
@@ -117,7 +119,10 @@ $(document).ready(function() {
                     alert(textStatus);
                 },
                 success: function(data, textStatus) {
-                    $('#info').parent().html(data);
+                    $contentContainer.html(data);
+                    if (isUikit) {
+                        $contentContainer.find('select').addClass('uk-select');
+                    }
                 },
                 complete: function(xhr, textStatus) {
                     initLog();

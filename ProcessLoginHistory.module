@@ -25,7 +25,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.5.2',
+            'version' => '1.5.3',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -460,6 +460,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
         // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
         $date = $this->date_format ? date($this->date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
+        $date = str_replace('-', '‑', $date);
         $data[] = "<span hidden>{$row['login_timestamp']}</span>{$date}";
         
         // basic user information; if user_id is set user exists or at least existed at
@@ -771,7 +772,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
         $disabled = "";
         if (count($options) < 2) {
-            $disabled = " disabled='disabled' class='disabled'";
+            $disabled = " disabled";
         }
 
         $attrs = "";

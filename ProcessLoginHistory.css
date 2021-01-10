@@ -52,8 +52,8 @@ form#filters div.filter:not(.no-icon)::before {
 }
 
 form#filters span.text-label {
-	display: inline-block;
-	margin-right: 1%;
+    display: inline-block;
+    margin-right: 1%;
 }
 
 #ui-datepicker-div {
