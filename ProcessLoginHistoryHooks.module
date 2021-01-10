@@ -3,13 +3,13 @@
 /**
  * Hooks for Process Login History
  *
- * This module inserts hooks required by Process Login History module and
- * handles saving data to related database table. Separated from main module
- * to keep ProcessWire from autoloading as much unnecessary code as possible.
+ * This module inserts hooks required by Process Login History module and takes care of saving data
+ * into related custom database table. Separated from main module in order to keep ProcessWire from
+ * autoloading any unnecessary code.
  * 
- * For detailed information, installation instructions etc. see README.md.
+ * For detailed information and installation instructions see README.md.
  *
- * @copyright 2012-2020 Teppo Koivula
+ * @copyright 2012-2021 Teppo Koivula
  * @license https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt GNU General Public License, version 2
  */
 class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableModule {
@@ -23,9 +23,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         return [
             'title' => 'Login History Hooks',
             'summary' => 'Hooks required by Process Login History for collecting data',
-            'href' => 'https://modules.processwire.com/modules/process-login-history/',
+            'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.4.0',
+            'version' => '1.4.1',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -47,10 +47,17 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * Name and latest schema version for database table used by this module
+     * Name of the custom database table used by this module
      *
+     * @var string
      */
     const TABLE_NAME = 'process_login_history';
+
+    /**
+     * Schema version of the custom database table
+     *
+     * @var int
+     */
     const SCHEMA_VERSION = 2;
 
     /**
@@ -59,16 +66,15 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * ProcessWire will automatically overwrite it with anything the user has specifically configured.
      * This is done in construct() rather than init() because ProcessWire populates config data after
      * construct(), but before init().
-     *
      */
     public function __construct() {
-        foreach(self::getDefaultData() as $key => $value) {
+        foreach (self::getDefaultData() as $key => $value) {
             $this->$key = $value;
         }
     }
 
     /**
-     * Module configuration
+     * Get module configuration inputfields
      *
      * @param array $data
      * @return InputfieldWrapper
@@ -133,9 +139,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * Initialization function
-     *
-     * This function attachs required hooks.
+     * Initialize the module and attach required hooks
      */
     public function init() {
 
@@ -243,7 +247,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * This function is executed after login form markup has been created
+     * This method is executed after login form markup has been created
      *
      * Used for injecting custom JavaScript file to page, which in turn adds
      * useful extra fields to the form.
@@ -252,14 +256,14 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      */
     public function hookBuildLoginForm(HookEvent $event) {
         $info = self::getModuleInfo();
-        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/login.js?v={$info['version']}");
+        $this->config->scripts->add($this->config->urls->ProcessLoginHistory . "js/login.js?v=" . $info['version']);
     }
 
     /**
-     * Function executed after buildForm method of Process Page Edit
+     * Method executed after buildForm method of Process Page Edit
      *
-     * The purpose of this is to add simplified version of login history
-     * and links to full data of that particular user to user edit view.
+     * The purpose of this mnethod is to add simplified version of login history and links to full
+     * data of that particular user into the user edit view.
      *
      * @param HookEvent $event
      */
@@ -355,8 +359,8 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     /**
      * Update database schema
      *
-     * This method applies incremental updates until latest schema version is
-     * reached, while also keeping schema_version config setting up to date.
+     * This method applies incremental updates until latest schema version is reached, while also
+     * keeping the schema_version config setting up to date.
      * 
      * @throws WireException if database schema version isn't recognized
      * @throws WireException if updating schema to specific version fails
@@ -417,10 +421,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * Get IP address
+     * Get IP address for current visitor
      *
-     * Note: this is almost identical to Session::getIP(), except that here we will not use the
-     * Client-IP header.
+     * Almost identical to Session::getIP(), except that we won't use the Client-IP header.
      *
      * @return string IP address
      */

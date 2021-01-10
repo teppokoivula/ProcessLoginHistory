@@ -3,17 +3,14 @@
 /**
  * Process Login History
  *
- * This module keeps track of login attempts to your site, both successful and
- * unsuccessful (tracking unsuccesful logins is off by default) in order to offer
- * better understanding about users' activity and environments they use / favor;
- * browsers, browser features such as Flash / JavaScript, devices, screen and
- * window sizes.
+ * This module keeps track of login attempts to your site, both successful and unsuccessful (tracking
+ * unsuccesful attempts is off by default, though) in order to offer better understanding about users'
+ * activity and environments: browsers and browser features, device types, screen/window sizes, etc.
  *
- * For detailed information, installation instructions etc. see README.md.
+ * For detailed information and installation instructions see README.md.
  *
- * @copyright 2012-2020 Teppo Koivula
+ * @copyright 2012-2021 Teppo Koivula
  * @license https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt GNU General Public License, version 2
- * @todo consider recording logout actions too
  */
 class ProcessLoginHistory extends Process implements ConfigurableModule {
 
@@ -26,9 +23,9 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         return [
             'title' => __('Login History'),
             'summary' => __('Keep track of site login history'),
-            'href' => 'https://modules.processwire.com/modules/process-login-history/',
+            'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.5.0',
+            'version' => '1.5.1',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -55,21 +52,26 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
     }
 
     /**
-     * Names of admin page and database table used by this module
+     * Name of admin page used by this module
+     *
+     * @var string
      */
     const PAGE_NAME = 'login-history';
 
     /**
      * Name of database table used by this module
+     *
+     * This is populated in __construct() based on the value from ProcessLoginHistoryHooks module.
+     *
+     * @var string
      */
     protected $table_name;
 
     /**
      * Array of optional permissions
      * 
-     * - If "login-history-remove" exists, user has to have it in order to
-     *   remove rows. If not, every user with access to this module can
-     *   also remove rows.
+     * - If "login-history-remove" exists, user has to have it in order to remove rows. If not,
+     *   every user with access to this module can also remove rows.
      * 
      * @var array
      */
@@ -115,7 +117,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // this is a container for fields, basically like a fieldset
         $fields = new InputfieldWrapper();
 
-        // since this is a static function, we can't use $this->modules, so get them from the global wire() function
+        // reference to the modules API variable
         $modules = wire('modules');
 
         // merge default config settings (custom values overwrite defaults)
@@ -160,10 +162,10 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
     /**
      * Initialization function called before any execute functions
-     *
      */
     public function init() {
         parent::init();
+
         // should date formatting occur?
         $defaults = self::getDefaultData();
         if ($this->date_format == $defaults['date_format']) {
@@ -308,8 +310,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * Build SQL query for fetching history data from custom database table
      *
      * @param array $group_by Fields to group results by, such as "id"
-     * @return array Array with SQL query ('query'), total row count ('total'),
-     *         start ('start') and limit ('limit')
+     * @return array Array with SQL query ('query'), total row count ('total'), start ('start') and limit ('limit')
      */
     private function buildQuery(array $group_by = []) {
 
@@ -422,8 +423,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * Executed when requesting removal of an individual row
      *
      * @return int
-     * @throws WirePermissionException if changelog-remove permission exists
-     *         but the current user doesn't have it.
+     * @throws WirePermissionException if changelog-remove permission exists but current user doesn't have it
      */
     public function ___executeDelete() {
         if (!$this->optional_permissions['remove']->id || $this->user->hasPermission($this->optional_permissions['remove'])) {
@@ -458,7 +458,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
         // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
         $date = $this->date_format ? date($this->date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
-        $data[] = "<span class='hidden'>{$row['login_timestamp']}</span>{$date}";
+        $data[] = "<span hidden>{$row['login_timestamp']}</span>{$date}";
         
         // basic user information; if user_id is set user exists or at least existed at
         // the time of login attempt (still need to check if that's currently true though)
@@ -686,13 +686,13 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $stmt->execute();
         $rowCount = $stmt->rowCount();
         if (!$rowCount || $rowCount > 1) {
-            $options[] = $this->_("by any user");
+            $options[] = $this->_("any user");
         }
         while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            $key = sprintf($this->_("by %s"), $row['username']); // %s will be replaced run-time by username
-            $options[$key] = $row['username'];
+            $options[] = $row['username'];
         }
-        $markup .= $this->renderSelect('username', $options);
+        $markup .= "<span class='text-label'>" . $this->_('by') . "</span>"
+            . $this->renderSelect('username', $options);
 
         // Real/removed/nonexistent users
         $options = [
@@ -788,7 +788,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $text = !is_numeric($key) ? $key : $option;
             if (isset($settings['translate'])) $text = $this->_($text);
             $selected = $this->input->get->$name == $value ? ' selected="selected"' : '';
-            $markup .= "<option{$selected} value='{$value}'>{$text}</option>";
+            $markup .= "<option{$selected} value='{$value}' name='{$name}'>{$text}</option>";
         }
 
         return "<div class='filter'{$disabled}><select name='{$name}'{$disabled}{$attrs}>{$markup}</select></div>";
