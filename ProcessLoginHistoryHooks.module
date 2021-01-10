@@ -3,13 +3,13 @@
 /**
  * Hooks for Process Login History
  *
- * This module inserts hooks required by Process Login History module and
- * handles saving data to related database table. Separated from main module
- * to keep ProcessWire from autoloading as much unnecessary code as possible.
+ * This module inserts hooks required by Process Login History module and takes care of saving data
+ * into related custom database table. Separated from main module in order to keep ProcessWire from
+ * autoloading any unnecessary code.
  * 
- * For detailed information, installation instructions etc. see README.md.
+ * For detailed information and installation instructions see README.md.
  *
- * @copyright 2012-2020 Teppo Koivula
+ * @copyright 2012-2021 Teppo Koivula
  * @license https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt GNU General Public License, version 2
  */
 class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableModule {
@@ -23,9 +23,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         return [
             'title' => 'Login History Hooks',
             'summary' => 'Hooks required by Process Login History for collecting data',
-            'href' => 'https://modules.processwire.com/modules/process-login-history/',
+            'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.4.0',
+            'version' => '1.4.1',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -47,10 +47,17 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * Name and latest schema version for database table used by this module
+     * Name of the custom database table used by this module
      *
+     * @var string
      */
     const TABLE_NAME = 'process_login_history';
+
+    /**
+     * Schema version of the custom database table
+     *
+     * @var int
+     */
     const SCHEMA_VERSION = 2;
 
     /**
@@ -59,16 +66,15 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * ProcessWire will automatically overwrite it with anything the user has specifically configured.
      * This is done in construct() rather than init() because ProcessWire populates config data after
      * construct(), but before init().
-     *
      */
     public function __construct() {
-        foreach(self::getDefaultData() as $key => $value) {
+        foreach (self::getDefaultData() as $key => $value) {
             $this->$key = $value;
         }
     }
 
     /**
-     * Module configuration
+     * Get module configuration inputfields
      *
      * @param array $data
      * @return InputfieldWrapper
@@ -133,9 +139,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * Initialization function
-     *
-     * This function attachs required hooks.
+     * Initialize the module and attach required hooks
      */
     public function init() {
 
@@ -150,8 +154,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         // hook after login to save login info into db 
         $this->addHookAfter('Session::login', $this, 'hookLogin');
 
-        // hook after ProcessLogin::buildLoginForm to add useful extra fields
+        // hook after ProcessLogin::buildLoginForm and Tfa::buildAuthCodeForm to add useful extra fields
         $this->addHookAfter('ProcessLogin::buildLoginForm', $this, 'hookBuildLoginForm');
+        $this->addHookAfter('Tfa::buildAuthCodeForm', $this, 'hookBuildLoginForm');
 
         // hook after ProcessPageEdit::buildForm to add latest login rows to user profile (admin only)
         $this->addHookAfter('ProcessPageEdit::buildForm', $this, 'hookProcessPageEditBuildForm');
@@ -191,21 +196,37 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         $user_agent_features = [];
         $login_was_successful = 0;
         $user_id = 0;
-        $user = null;
+        $username = null;
 
-        // fetch and filter username from event arguments (using htmlentities() instead of
-        // $sanitizer->pageName() to allow keeping track of broken / strange input values)
-        $username = $this->database->escapeStr(htmlentities($event->arguments[0]));
+        // first event argument may contain User object or username string
+        if ($event->arguments[0] instanceof User) {
+            $login_was_successful = 0;
+            $user = $event->arguments[0];
+            $user_id = $user->id;
+            $username = $user->name;
+        }
 
-        // try to get user matching given username
-        if (strtolower($username) == $this->sanitizer->pageName($username)) {
-            $user = $this->users->get("name=$username");
-            if ($user->id) {
-                $user_id = $user->id;
-                if ($event->return) $login_was_successful = 1;
+        if ($user === null) {
+            // filter username from event arguments (note: using htmlentities() instead of $sanitizer->pageName() to keep
+            // track of broken / strange input values)
+            $username = $this->database->escapeStr(htmlentities($event->arguments[0]));
+
+            // try to get user matching given username
+            if (strtolower($username) == $this->sanitizer->pageName($username)) {
+                $user = $this->users->get("name=$username");
+                if ($user->id) {
+                    $user_id = $user->id;
+                }
             }
         }
+
+        // bail out early if there's no user and we're not currently logging login attempts for nonexisting users
         if (!$user->id && !$this->log_nonexistent_users) return;
+
+        // check if the login attempt was successful
+        if ($event->return !== null) {
+            $login_was_successful = 1;
+        }
 
         // user agent features
         if (isset($_POST['flash'])) $user_agent_features['flash'] = 1;
@@ -243,23 +264,24 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * This function is executed after login form markup has been created
+     * This method is executed after login form markup has been created
      *
-     * Used for injecting custom JavaScript file to page, which in turn adds
-     * useful extra fields to the form.
+     * Note: this method applies to the regular login form as well as the TFA code input form.
+     *
+     * Used for injecting custom JavaScript file to page, which in turn adds useful extra fields to the form.
      *
      * @param HookEvent $event
      */
     public function hookBuildLoginForm(HookEvent $event) {
         $info = self::getModuleInfo();
-        $this->config->scripts->add($this->config->urls->ProcessLoginHistory."js/login.js?v={$info['version']}");
+        $this->config->scripts->add($this->config->urls->ProcessLoginHistory . "js/login.js?v=" . $info['version']);
     }
 
     /**
-     * Function executed after buildForm method of Process Page Edit
+     * Method executed after buildForm method of Process Page Edit
      *
-     * The purpose of this is to add simplified version of login history
-     * and links to full data of that particular user to user edit view.
+     * The purpose of this mnethod is to add simplified version of login history and links to full
+     * data of that particular user into the user edit view.
      *
      * @param HookEvent $event
      */
@@ -324,7 +346,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
                 $date_diff = "";
             }
 
-            // was login attempt succesful?
+            // was login attempt successful?
             $status = $this->_("unsuccessful attempt");
             if ($row['login_was_successful']) $status = $this->_("successful attempt");
 
@@ -355,8 +377,8 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     /**
      * Update database schema
      *
-     * This method applies incremental updates until latest schema version is
-     * reached, while also keeping schema_version config setting up to date.
+     * This method applies incremental updates until latest schema version is reached, while also
+     * keeping the schema_version config setting up to date.
      * 
      * @throws WireException if database schema version isn't recognized
      * @throws WireException if updating schema to specific version fails
@@ -417,10 +439,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
-     * Get IP address
+     * Get IP address for current visitor
      *
-     * Note: this is almost identical to Session::getIP(), except that here we will not use the
-     * Client-IP header.
+     * Almost identical to Session::getIP(), except that we won't use the Client-IP header.
      *
      * @return string IP address
      */
