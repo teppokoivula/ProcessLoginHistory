@@ -25,7 +25,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.4.1',
+            'version' => '1.4.2',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -84,7 +84,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         // this is a container for fields, basically like a fieldset
         $fields = new InputfieldWrapper();
 
-        // since this is a static function, we can't use $this->modules, so get them from the global wire() function
+        // reference to the modules API variable
         $modules = wire('modules');
 
         // should we log login attempts for nonexistent users?

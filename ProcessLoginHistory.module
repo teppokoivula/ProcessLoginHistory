@@ -25,7 +25,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.5.1',
+            'version' => '1.5.2',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -52,14 +52,14 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
     }
 
     /**
-     * Name of admin page used by this module
+     * Name of the admin page related to this module
      *
      * @var string
      */
     const PAGE_NAME = 'login-history';
 
     /**
-     * Name of database table used by this module
+     * Name of the database table used by this module
      *
      * This is populated in __construct() based on the value from ProcessLoginHistoryHooks module.
      *
@@ -422,21 +422,23 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
     /**
      * Executed when requesting removal of an individual row
      *
-     * @return int
+     * @return int|false
+     *
      * @throws WirePermissionException if changelog-remove permission exists but current user doesn't have it
      */
     public function ___executeDelete() {
         if (!$this->optional_permissions['remove']->id || $this->user->hasPermission($this->optional_permissions['remove'])) {
-            if ((int) $this->input->get->id != $this->input->get->id) return false;
+            if ((int) $this->input->get->id != $this->input->get->id) {
+                return false;
+            }
             $id = (int) $this->input->get->id;
             $sql = "DELETE FROM {$this->table_name} WHERE id=:id LIMIT 1";
             $query = $this->database->prepare($sql); 
             $query->bindValue(':id', $id, \PDO::PARAM_INT);
             $query->execute();
             return 1;
-        } else {
-            throw new WirePermissionException($this->_("You do not have the permission required by this action."));
         }
+        throw new WirePermissionException($this->_("You do not have the permission required by this action."));
     }
 
     /**
@@ -466,9 +468,8 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $query_string = htmlentities(
             http_build_query(
                 array_merge(
-                    $this->input->get->getArray(),
-                    [
-                        'username' => $selected ? null : $row['username']
+                    $this->input->get->getArray(), [
+                        'username' => $selected ? null : $row['username'],
                     ]
                 )
             )
@@ -498,8 +499,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 $query_string = htmlentities(
                     http_build_query(
                         array_merge(
-                            $this->input->get->getArray(),
-                            [
+                            $this->input->get->getArray(), [
                                 'ip_address' => $selected ? null : $row['ip_address'],
                             ]
                         )
@@ -518,8 +518,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $query_string = htmlentities(
             http_build_query(
                 array_merge(
-                    $this->input->get->getArray(),
-                    [
+                    $this->input->get->getArray(), [
                         'login_was_successful' => $selected ? null : ($row['login_was_successful'] ? 1 : 0),
                     ]
                 )
