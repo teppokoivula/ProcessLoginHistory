@@ -154,8 +154,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         // hook after login to save login info into db 
         $this->addHookAfter('Session::login', $this, 'hookLogin');
 
-        // hook after ProcessLogin::buildLoginForm to add useful extra fields
+        // hook after ProcessLogin::buildLoginForm and Tfa::buildAuthCodeForm to add useful extra fields
         $this->addHookAfter('ProcessLogin::buildLoginForm', $this, 'hookBuildLoginForm');
+        $this->addHookAfter('Tfa::buildAuthCodeForm', $this, 'hookBuildLoginForm');
 
         // hook after ProcessPageEdit::buildForm to add latest login rows to user profile (admin only)
         $this->addHookAfter('ProcessPageEdit::buildForm', $this, 'hookProcessPageEditBuildForm');
@@ -265,8 +266,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     /**
      * This method is executed after login form markup has been created
      *
-     * Used for injecting custom JavaScript file to page, which in turn adds
-     * useful extra fields to the form.
+     * Note: this method applies to the regular login form as well as the TFA code input form.
+     *
+     * Used for injecting custom JavaScript file to page, which in turn adds useful extra fields to the form.
      *
      * @param HookEvent $event
      */
