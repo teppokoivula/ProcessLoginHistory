@@ -25,7 +25,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.4.2',
+            'version' => '1.5.0',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -195,6 +195,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         $user_agent = $this->database->escapeStr($_SERVER['HTTP_USER_AGENT']);
         $user_agent_features = [];
         $login_was_successful = 0;
+        $user = null;
         $user_id = 0;
         $username = null;
 
@@ -202,7 +203,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         if ($event->arguments[0] instanceof User) {
             $login_was_successful = 0;
             $user = $event->arguments[0];
-            $user_id = $user->id;
+            $user_id = $user->id ?: 0;
             $username = $user->name;
         }
 
@@ -220,8 +221,10 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             }
         }
 
-        // bail out early if there's no user and we're not currently logging login attempts for nonexisting users
-        if (!$user->id && !$this->log_nonexistent_users) return;
+        // check if this event should be logged
+        if (!$this->shouldLogLoginEvent($event, $user)) {
+            return;
+        }
 
         // check if the login attempt was successful
         if ($event->return !== null) {
@@ -233,7 +236,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         if (isset($_POST['javascript'])) $user_agent_features['javascript'] = 1;
         if (isset($_POST['screen'])) $user_agent_features['screen'] = $_POST['screen'];
         if (isset($_POST['window'])) $user_agent_features['window'] = $_POST['window'];
-        if (count($user_agent_features)) {
+        if (!empty($user_agent_features)) {
             foreach ($user_agent_features as &$feature) {
                 $feature = wire()->sanitizer->text(str_replace("'", "", $feature));
             }
@@ -242,10 +245,41 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             $user_agent_features = null;
         }
 
-        // grab the IP address from ProcessWire
+        // IP address
         $ip_address = $this->log_ip_addresses ? $this->getIP() : null;
 
-        // insert new row into database
+        // log login attempt
+        $this->insert($user_id, $username, $login_was_successful, $user_agent, $user_agent_features, $ip_address);
+    }
+
+    /**
+     * Should we log this login event?
+     *
+     * @param HookEvent $event Original hook event, provided for hooks
+     * @param Page|null $user User may be an object extending Page class (User or NullPage) or null
+     * @return bool
+     */
+    protected function ___shouldLogLoginEvent(HookEvent $event, ?Page $user): bool {
+
+        // bail out early if there's no user and we're not currently logging login attempts for nonexisting users
+        if (($user === null || !$user->id) && !$this->log_nonexistent_users) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Insert row into database
+     *
+     * @param int $user_id
+     * @param string $username
+     * @param int $login_was_successful
+     * @param string $user_agent
+     * @param string|null $user_agent_features
+     * @param string|null $ip_address
+     */
+    protected function insert(int $user_id, string $username, int $login_was_successful, string $user_agent, ?string $user_agent_features, ?string $ip_address) {
         $sql = "INSERT INTO " . self::TABLE_NAME . " " .
                "(user_id, username, login_was_successful, user_agent, user_agent_features, ip_address) VALUES " .
                "(:user_id, :username, :login_was_successful, :user_agent, :user_agent_features, :ip_address) ";
