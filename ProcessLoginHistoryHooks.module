@@ -3,13 +3,12 @@
 /**
  * Hooks for Process Login History
  *
- * This module inserts hooks required by Process Login History module and takes care of saving data
- * into related custom database table. Separated from main module in order to keep ProcessWire from
- * autoloading any unnecessary code.
+ * This module inserts hooks required by Process Login History module and takes care of saving data into related custom
+ * database table. Separated from main module in order to keep ProcessWire from autoloading any unnecessary code.
  * 
- * For detailed information and installation instructions see README.md.
+ * For more information see README.md.
  *
- * @copyright 2012-2021 Teppo Koivula
+ * @copyright 2012-2022 Teppo Koivula
  * @license https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt GNU General Public License, version 2
  */
 class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableModule {
@@ -25,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.5.0',
+            'version' => '1.6.0',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -42,6 +41,8 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      */
     public static function getDefaultData() {
         return [
+            'history_max_age' => null,
+            'data_max_age_days' => null,
             'schema_version' => 1,
         ];
     }
@@ -79,48 +80,65 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * @param array $data
      * @return InputfieldWrapper
      */
-    public static function getModuleConfigInputfields(array $data) {
+    public function getModuleConfigInputfields(array $data) {
 
-        // this is a container for fields, basically like a fieldset
-        $fields = new InputfieldWrapper();
+        // container for fields
+        $fields = $this->wire(new InputfieldWrapper());
 
-        // reference to the modules API variable
-        $modules = wire('modules');
+        // merge default config settings (custom values overwrite defaults)
+        $defaults = self::getDefaultData();
+        $data = array_merge($defaults, $data);
+
+        // logging settings
+        $logging = $this->modules->get("InputfieldFieldset");
+        $logging->name = "logging";
+        $logging->label = __("Logging");
+        $logging->description = __("These settings define what kind of data gets logged.");
+        $logging->icon = "book";
+        $fields->add($logging);
 
         // should we log login attempts for nonexistent users?
-        $field = $modules->get("InputfieldCheckbox");
+        $field = $this->modules->get("InputfieldCheckbox");
         $field->name = "log_nonexistent_users";
         $field->label = __("Log nonexistent users");
         $field->description = __("If this option is selected, attempts to log in as nonexistent users will be logged.");
-        if (isset($data[$field->name])) $field->checked = "checked";
-        $fields->add($field);
+        $field->checked = !empty($data[$field->name]);
+        $logging->add($field);
 
         // enable logging of user's IP address?
-        $field = $modules->get("InputfieldCheckbox");
+        $field = $this->modules->get("InputfieldCheckbox");
         $field->name = "log_ip_addresses";
         $field->label = __("Log IP addresses");
         $field->description = __("Enable logging IP addresses of users logging in (or attempting to)?");
         $field->notes = __("IP addresses can be considered personal data, which is why logging them is not enabled by default.");
-        if (isset($data[$field->name])) $field->checked = "checked";
-        $fields->add($field);
+        $field->checked = !empty($data[$field->name]);
+        $logging->add($field);
 
         // give preference to client headers for IP?
-        $field = $modules->get("InputfieldCheckbox");
+        $field = $this->modules->get("InputfieldCheckbox");
         $field->name = "prefer_client_ip";
         $field->label = __("Give preference to client headers for IP?");
         $field->description = __("Enabling this option will use HTTP_CLIENT_IP and HTTP_X_FORWARDED_FOR as primary methods for getting the IP.");
         $field->notes = __("This may be necessary in certain environments, such as when using a load balancer or proxy.");
         $field->showIf = "log_ip_addresses=1";
-        if (isset($data[$field->name])) $field->checked = "checked";
-        $fields->add($field);
+        $field->checked = !empty($data[$field->name]);
+        $logging->add($field);
+
+        // data retention settings
+        $data_retention = $this->modules->get("InputfieldFieldset");
+        $data_retention->name = "data_retention";
+        $data_retention->label = __("Data retention");
+        $data_retention->description = __("These settings define how long collected data should be retained for, as well as the circumstances under which it may be erased.");
+        $data_retention->icon = "database";
+        $fields->add($data_retention);
 
         // for how long should collected data be retained?
-        $field = $modules->get("InputfieldSelect");
+        $field = $this->modules->get("InputfieldSelect");
         $field->name = "history_max_age";
         $field->label = __("Data max age");
         $field->description = __("For how long should we retain collected data?");
         $field->notes = __("Automatic cleanup requires LazyCron module, which isn't currently installed.");
-        if ($modules->isInstalled("LazyCron")) {
+        if ($this->modules->isInstalled("LazyCron")) {
             $field->addOptions([
                 '1 WEEK' => __('1 week'),
                 '2 WEEK' => __('2 weeks'),
@@ -129,11 +147,44 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
                 '3 MONTH' => __('3 months'),
                 '6 MONTH' => __('6 months'),
                 '1 YEAR' => __('1 year'),
+                'num_days' => __('Specific number of days'),
             ]);
             $field->notes = __("Leave empty to disable automatic cleanup.");
             $field->value = isset($data[$field->name]) ? $data[$field->name] : null;
         }
-        $fields->add($field);
+        $data_retention->add($field);
+
+        // alternative to predefined intervals: number of days to retain collected data
+        $field = $this->modules->get("InputfieldInteger");
+        $field->name = "data_max_age_days";
+        $field->label = __("Data max age in days");
+        $field->description = __("This setting provides more granular control over the data retention period.");
+        $field->notes = __("If you leave this field empty, data will be retained indefinitely.");
+        $field->icon = "clock-o";
+        $field->value = $data[$field->name] ?? null;
+        $field->min = 1;
+        $field->showIf = "history_max_age=num_days";
+        $data_retention->add($field);
+
+        // limit for collected data rows
+        $field = $this->modules->get("InputfieldInteger");
+        $field->name = "data_max_rows";
+        $field->label = __("Data max rows");
+        $field->description = __("How many rows of data should we retain?");
+        $field->notes = __("Note that extra rows may be removed if there are identical timestamps. If you leave this field empty, data is not limited by number of rows.");
+        $field->icon = "ellipsis-v";
+        $field->value = $data[$field->name] ?? null;
+        $field->min = 1;
+        $data_retention->add($field);
+
+        // prune data now?
+        $field = $this->modules->get("InputfieldCheckbox");
+        $field->name = "prune_data_now";
+        $field->label = __("Prune data now?");
+        $field->description = __("If you check this option and save module settings, data retention settings will be applied right away, meaning that any old data will be removed.");
+        $field->notes = __('Note: this operation may take a long time.');
+        $field->icon = "trash";
+        $data_retention->add($field);
 
         return $fields;
     }
@@ -151,6 +202,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         // remove expired history rows daily
         $this->addHook("LazyCron::everyDay", $this, 'cleanup');
 
+        // trigger data pruning (cleanup) when module config is saved
+        $this->addHookBefore('Modules::saveConfig', $this, 'saveConfig');
+
         // hook after login to save login info into db 
         $this->addHookAfter('Session::login', $this, 'hookLogin');
 
@@ -166,19 +220,86 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * Delete data older than given interval
      *
      * @param string|null|HookEvent $interval Interval, defaults to history_max_age setting
+     * @param null|int $max_rows max rows of data, defaults to data_max_rows setting
      */
-    public function cleanup($interval = null) {
+    public function cleanup($interval = null, ?int $max_rows = null) {
 
-        if ($interval instanceof HookEvent) $interval = $this->history_max_age;
-        if (is_null($interval) && is_null($this->history_max_age)) return;
-        else if (is_null($interval)) $interval = $this->history_max_age;
+        // called via LazyCron or null value provided for interval, get history_max_age from module config
+        if ($interval instanceof HookEvent || $interval === null) {
+            $interval = empty($this->history_max_age) ? null : $this->history_max_age;
+        }
 
-        $interval = $this->database->escapeStr($interval);
-        $sql = "DELETE FROM " . self::TABLE_NAME . " WHERE login_timestamp < DATE_SUB(NOW(), INTERVAL $interval)";
-        try {
-            $this->database->exec($sql);
-        } catch(\Exception $e) {
-            $this->error($e->getMessage());
+        // in case interval is "num_days", get value from the data_max_age_days setting instead
+        if ($interval === 'num_days') {
+            $interval = $this->data_max_age_days ? (int) $this->data_max_age_days : null;
+        }
+
+        // define number of rows
+        $max_rows = $max_rows ?? $this->data_max_rows ?? null;
+        $max_rows = $max_rows !== null && (int) $max_rows == $max_rows && (int) $max_rows > 0 ? (int) $max_rows : null;
+
+        // delete old data from database
+        if ($interval !== null) {
+            $interval = is_int($interval) ? $interval . ' DAY' : $this->database->escapeStr($interval);
+            $sql = "DELETE FROM " . self::TABLE_NAME . " WHERE login_timestamp < DATE_SUB(NOW(), INTERVAL $interval)";
+            try {
+                $this->database->exec($sql);
+            } catch(\Exception $e) {
+                $this->error($e->getMessage());
+            }
+        }
+
+        // delete extraneous rows from database
+        if ($max_rows !== null) {
+            $sql = "DELETE FROM " . self::TABLE_NAME . " WHERE login_timestamp <= (SELECT login_timestamp FROM " . self::TABLE_NAME . " ORDER BY login_timestamp DESC LIMIT $max_rows, 1)";
+            try {
+                $this->database->exec($sql);
+            } catch(\Exception $e) {
+                $this->error($e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * This method gets triggered when module config is saved
+     *
+     * @param HookEvent $event
+     */
+    protected function saveConfig(HookEvent $event) {
+
+        // bail out early if saving another module's config
+        $class = $event->arguments[0];
+        if (is_string($class) && $class !== $this->className || is_object($class) && $class != $this) {
+            return;
+        }
+
+        // check if "prune data now" option is checked
+        $data = $event->arguments[1];
+        if (is_array($data) && !empty($data['prune_data_now']) || $data === 'prune_data_now' && !empty($event->arguments[2])) {
+
+            // make sure that latest values are used in case data retention rules are saved during current request
+            $interval = is_array($data) && !empty($data['history_max_age']) ? $data['history_max_age'] : null;
+            if ($interval === 'num_days') {
+                $interval = !empty($data['data_max_age_days']) ? (int) $data['data_max_age_days'] : null;
+            }
+            $max_rows = is_array($data) && !empty($data['data_max_rows']) ? $data['data_max_rows'] : null;
+
+            // prune data
+            $is_valid_interval = $interval !== null || !is_array($data) && $this->history_max_age && ($this->history_max_age !== 'num_days' || !empty($this->data_max_age_days));
+            $is_valid_rows = $max_rows !== null;
+            if ($is_valid_interval || $is_valid_rows) {
+                $this->cleanup($interval, $max_rows);
+                $this->message($this->_('Data was pruned according to rules specified by configured data retention settings.'));
+            } else {
+                $this->warning($this->_('Module settings were saved but data retention rules were not specified, so no data was pruned.'));
+            }
+
+            // make sure that "prune data now" option value doesn't get saved
+            if (is_array($data)) {
+                unset($data['prune_data_now']);
+                $event->arguments(1, $data);
+            }
+            $event->arguments(2, null);
         }
     }
 
@@ -232,10 +353,10 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         }
 
         // user agent features
-        if (isset($_POST['flash'])) $user_agent_features['flash'] = 1;
-        if (isset($_POST['javascript'])) $user_agent_features['javascript'] = 1;
-        if (isset($_POST['screen'])) $user_agent_features['screen'] = $_POST['screen'];
-        if (isset($_POST['window'])) $user_agent_features['window'] = $_POST['window'];
+        if (!empty($_POST['flash'])) $user_agent_features['flash'] = 1;
+        if (!empty($_POST['javascript'])) $user_agent_features['javascript'] = 1;
+        if (!empty($_POST['screen'])) $user_agent_features['screen'] = $this->sanitizeScreenSize($_POST['screen']);
+        if (!empty($_POST['window'])) $user_agent_features['window'] = $this->sanitizeScreenSize($_POST['window']);
         if (!empty($user_agent_features)) {
             foreach ($user_agent_features as &$feature) {
                 $feature = wire()->sanitizer->text(str_replace("'", "", $feature));
@@ -250,6 +371,19 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         // log login attempt
         $this->insert($user_id, $username, $login_was_successful, $user_agent, $user_agent_features, $ip_address);
+    }
+
+    /**
+     * Sanitize screen size
+     *
+     * @param mixed
+     * @return string|null
+     */
+    protected function sanitizeScreenSize($screen_size): ?string {
+        if (is_string($screen_size) && preg_match('/^[0-9]+x[0-9]+$/', $screen_size)) {
+            return $screen_size;
+        }
+        return null;
     }
 
     /**

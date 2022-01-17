@@ -10,19 +10,23 @@ $(document).ready(function() {
             $(this)
                 .find('> td:last-child')
                 .wrapInner('<span hidden></span>')
-                .append('<a class="more">' + config.log.i18n.more + '</a>');
+                .append('<a class="more" tabindex="0"><span class="text">' + config.log.i18n.more + '</span><i class="icon" aria-hidden="true"></i></a>');
         });
 
         // more/less functionality
-        $table.on('click', 'a.more', function() {
-            var $tr = $(this).parents('tr:first').toggleClass('open');
-            $(this).text(config.log.i18n[$tr.hasClass('open') ? 'less' : 'more']);
-            if ($tr.hasClass('open')) {
-                var colspan = $tr.find('> td').length;
-                var details = $(this).prev('[hidden]').html();
-                $tr.after('<tr class="more"><td colspan="' + colspan + '"><div>' + details + '</div></td></tr>');
-            } else {
-                $tr.next('tr.more').remove();
+        $table.on('click keyup', 'a.more', function(e) {
+            if (e.type == 'click' || e.type == 'keyup' && (e.keyCode == 32 || e.keyCode == 40 || e.keyCode == 38|| e.keyCode == 13)) {
+                e.preventDefault();
+                var $tr = $(this).parents('tr:first').toggleClass('open');
+                $(this).children('.text:first').text(config.log.i18n[$tr.hasClass('open') ? 'less' : 'more']);
+                if ($tr.hasClass('open') || e.type == 'keyup' && e.keyCode == 38) {
+                    var colspan = $tr.find('> td').length;
+                    var details = $(this).prev('[hidden]').html();
+                    $tr.after('<tr class="more"><td colspan="' + colspan + '">' + details + '</td></tr>');
+                    $tr.next('tr.more').find('.details:first').focus();
+                } else {
+                    $tr.next('tr.more').remove();
+                }
             }
         });
 
@@ -51,6 +55,9 @@ $(document).ready(function() {
         if ($table.find('a.more').length == 1 && window.location.search.match(/[?&]id=/)) {
             $table.find('a.more').trigger('click');
         }
+
+        // display JS-only icons
+        $('.js-icon').addClass('icon').removeClass('js-icon');
 
         // AJAX filter form
         $filters.on('change', 'select, input', function() {
@@ -126,6 +133,9 @@ $(document).ready(function() {
                 },
                 complete: function(xhr, textStatus) {
                     initLog();
+                    if (typeof AdminDataTable !== 'undefined') {
+                        AdminDataTable.init();
+                    }
                 }
             });
         }

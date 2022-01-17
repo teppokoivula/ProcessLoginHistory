@@ -3,13 +3,12 @@
 /**
  * Process Login History
  *
- * This module keeps track of login attempts to your site, both successful and unsuccessful (tracking
- * unsuccesful attempts is off by default, though) in order to offer better understanding about users'
- * activity and environments: browsers and browser features, device types, screen/window sizes, etc.
+ * This module keeps track of login attempts to the site in order to offer better understanding about users' activity,
+ * as well as their environments (browsers and browser features, device types, screen/window sizes, etc.)
  *
- * For detailed information and installation instructions see README.md.
+ * For more information see README.md.
  *
- * @copyright 2012-2021 Teppo Koivula
+ * @copyright 2012-2022 Teppo Koivula
  * @license https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt GNU General Public License, version 2
  */
 class ProcessLoginHistory extends Process implements ConfigurableModule {
@@ -25,7 +24,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.6.0',
+            'version' => '1.7.0',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -48,6 +47,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'row_limit' => 25,
             'date_format' => 'Y-m-d H:i:s',
             'user_label_format' => '{name}',
+            'rss_content_type' => 0,
         ];
     }
 
@@ -61,11 +61,20 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
     /**
      * Name of the database table used by this module
      *
-     * This is populated in __construct() based on the value from ProcessLoginHistoryHooks module.
-     *
      * @var string
      */
-    protected $table_name;
+    const TABLE_NAME = 'process_login_history';
+
+    /**
+     * Valid Content-Type headers for the RSS feed
+     *
+     * @var array
+     */
+    public static $rss_content_types = [
+        0 => 'application/rss+xml',
+        1 => 'application/xml',
+        2 => 'text/xml',
+    ];
 
     /**
      * Array of optional permissions
@@ -85,10 +94,8 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * construct(), but before init().
      */
     public function __construct() {
-        // Get name of database table and any available module config settings
-        // from ProcessLoginHistoryHooks module
+        // Get name of any available module config settings from ProcessLoginHistoryHooks module
         if ($this->modules->isInstalled("ProcessLoginHistoryHooks")) {
-            $this->table_name = ProcessLoginHistoryHooks::TABLE_NAME;
             $data = $this->modules->getModuleConfigData("ProcessLoginHistoryHooks");
             /** @var ProcessLoginHistoryHooks */
             $loginHistoryHooks = $this->modules->get("ProcessLoginHistoryHooks");
@@ -98,7 +105,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 $this->$key = $value;
             }
         }
-        foreach(self::getDefaultData() as $key => $value) {
+        foreach (self::getDefaultData() as $key => $value) {
             $this->$key = $value;
         }
         $this->optional_permissions = [
@@ -157,6 +164,16 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $field->value = $data['row_limit'];
         $fields->add($field);
 
+        // RSS Content-Type header
+        $field = $modules->get("InputfieldSelect");
+        $field->name = "rss_content_type";
+        $field->label = __("RSS content type");
+        $field->description = __("The value of the content-type header that gets sent with an RSS feed.");
+        $field->icon = "code";
+        $field->addOptions(self::$rss_content_types);
+        $field->value = $data['rss_content_type'];
+        $fields->add($field);
+
         return $fields;
     }
 
@@ -164,6 +181,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * Initialization function called before any execute functions
      */
     public function init() {
+
         parent::init();
 
         // should date formatting occur?
@@ -200,7 +218,9 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             '', // placeholder
             $this->_('More'),
         ];
-        if ($this->log_ip_addresses) array_splice($headerRow, 2, 0, $this->_("IP"));
+        if ($this->log_ip_addresses) {
+            array_splice($headerRow, 2, 0, $this->_("IP"));
+        }
         $table->headerRow($headerRow);
 
         // fetch rows from database and add them to our data table
@@ -235,16 +255,25 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
         // basic information about found rows
         $info = "<div id='info'><h2>";
-        $info .= sprintf($this->_n("One matching row found.", "%d matching rows found.", $query['total']), $query['total']);
+        $info .= sprintf(
+            $this->_n("One matching row found.", "%d matching rows found.",
+            $query['total']),
+            $query['total']
+        );
         $info .= "</h2></div>";
 
         // feed links
         $feeds = "<ul id='feeds'>";
         $feeds .= "<li><a href='./rss/' target='_blank'>" . $this->_('RSS') . "</a></li>";
         if ($this->modules->isInstalled('ProcessLoginHistoryRSS')) {
+            /** @var ProcessLoginHistoryRSS */
             $loginHistoryRSS = $this->modules->get('ProcessLoginHistoryRSS');
-            if ($loginHistoryRSS->feed_url && $loginHistoryRSS->show_feed_link) {
-                $feeds .= "<li><a href='{$loginHistoryRSS->feed_url}' target='_blank'>" . $this->_('Public RSS') . "</a></li>";
+            if ($loginHistoryRSS->show_feed_link) {
+                $feed_url = $loginHistoryRSS->getRSSFeedURL();
+                if ($feed_url) {
+                    $feeds .= "<li><a href='{$feed_url}' target='_blank'>" . $this->_('Public RSS') . "</a></li>";
+                    unset($feed_url);
+                }
             }
         }
         $feeds .= "</ul>";
@@ -263,7 +292,9 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $query = $this->buildQuery();
         $stmt = $this->database->prepare($query['query']);
         $stmt->execute();
-        while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) $data[] = $row;
+        while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            $data[] = $row;
+        }
 
         // send header and output JSON
         header('Content-type: application/json');
@@ -289,20 +320,30 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $query = $this->buildQuery();
         $stmt = $this->database->prepare($query['query']);
         $stmt->execute();
+        $guid_base_url = null;
+        $process_page = $this->pages->get("template=admin, process=" . $this->modules->getModuleID($this) . ", name=" . self::PAGE_NAME);
+        if ($process_page->id) {
+            $guid_base_url = 'http' . ($this->config->https ? 's' : '') . '://' . $this->config->httpHost . $process_page->url . '?id=';
+        }
         while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
             $item = $channel->addChild('item');
             $item->addChild('title', $this->parseString($row));
             if ($row['user_agent']) {
-                $item->addChild('description', $this->renderBrowserInfo($row['user_agent'], $row['user_agent_features']));
+                $item->addChild('description', $this->sanitizer->unentities($this->renderBrowserInfo($row['user_agent'], $row['user_agent_features'])));
             } else {
                 $item->addChild('description', $this->_("No data available."));
             }
-            $item->addChild('link', 'http' . ($this->config->https ? 's' : '') . '://' . $this->config->httpHost . $this->config->urls->admin . 'setup/' . self::PAGE_NAME . '/?id=' . (int) $row['id']);
-            $item->addChild('pubDate', date('r', strtotime($row['login_timestamp'])));
+            if ($guid_base_url) {
+                $item->addChild('guid', $guid_base_url . (int) $row['id']);
+            }
+            $item->addChild('pubDate', date(\DATE_RSS, strtotime($row['login_timestamp'])));
         }
 
         // send header and output RSS
-        header('Content-type: application/rss+xml; charset=UTF-8');
+        if (((int) $this->rss_content_type != $this->rss_content_type) || !isset(self::$rss_content_types[$this->rss_content_type])) {
+            $this->rss_content_type = 0;
+        };
+        header('Content-type: ' . self::$rss_content_types[$this->rss_content_type] . '; charset=UTF-8');
         exit($rss->asXML());
     }
 
@@ -312,7 +353,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * @param array $group_by Fields to group results by, such as "id"
      * @return array Array with SQL query ('query'), total row count ('total'), start ('start') and limit ('limit')
      */
-    private function buildQuery(array $group_by = []) {
+    private function buildQuery(array $group_by = []): array {
 
         // $joins and $where arrays are used to construct where clause and joins
         // later. $where contains rules like "key = '$value'" and $joins actual
@@ -386,7 +427,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
 
         // total count of rows in database table
         $count = $group_by ? "DISTINCT " . substr($group_by, 9) : "*";
-        $sql = "SELECT COUNT($count) FROM {$this->table_name} {$joins} {$where}";
+        $sql = "SELECT COUNT($count) FROM " . self::TABLE_NAME . " {$joins} {$where}";
         $stmt = $this->database->prepare($sql); 
         $stmt->execute();
         $row = $stmt->fetch(\PDO::FETCH_NUM);
@@ -407,7 +448,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $order_by = "ORDER BY {$sort} {$sort_order}, id DESC";
 
         // stick pieces together to construct final SQL query
-        $query = "SELECT {$this->table_name}.* FROM {$this->table_name} {$joins} {$where} {$group_by} {$order_by}";
+        $query = "SELECT " . self::TABLE_NAME . ".* FROM " . self::TABLE_NAME . " {$joins} {$where} {$group_by} {$order_by}";
         if ($limit) $query .= " LIMIT {$start}, {$limit}";
 
         // return SQL query along with some additional data
@@ -432,7 +473,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 return false;
             }
             $id = (int) $this->input->get->id;
-            $sql = "DELETE FROM {$this->table_name} WHERE id=:id LIMIT 1";
+            $sql = "DELETE FROM " . self::TABLE_NAME . " WHERE id=:id LIMIT 1";
             $query = $this->database->prepare($sql); 
             $query->bindValue(':id', $id, \PDO::PARAM_INT);
             $query->execute();
@@ -447,7 +488,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * @param array $row
      * @return array
      */
-    private function parseTableRow(array $row) {
+    private function parseTableRow(array $row): array {
 
         // container
         $data = [];
@@ -459,9 +500,11 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         }
 
         // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
-        $date = $this->date_format ? date($this->date_format, strtotime($row['login_timestamp'])) : $row['login_timestamp'];
+        $time = strtotime($row['login_timestamp']);
+        $date = $this->date_format ? date($this->date_format, $time) : $row['login_timestamp'];
         $date = str_replace('-', '‑', $date);
-        $data[] = "<span hidden>{$row['login_timestamp']}</span>{$date}";
+        $data[] = "<span hidden>" . str_replace(['-', ':', ' '], '', $row['login_timestamp']) . "</span>"
+            . "<time datetime='" . date('c', $time) . "'>{$date}</time>";
         
         // basic user information; if user_id is set user exists or at least existed at
         // the time of login attempt (still need to check if that's currently true though)
@@ -475,10 +518,16 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 )
             )
         );
-        $filter = " <a class='ajax action{$selected}' href='?{$query_string}'><i class='fa fa-filter'></i></a>";
+        $filter = " <a class='ajax action{$selected}' href='?{$query_string}'>"
+            . "<i class='fa fa-filter' aria-label='" . sprintf($this->_('Filter by username: %s'), $row['username']) . "'></i>"
+            . "</a>";
         if (!$row['user_id']) {
             // nonexistent user, no need to show an edit link
-            $data[] = "<span class='user guest' title='" . $this->_("nonexistent") . "'>{$row['username']}</span>{$filter}";
+            $data[] = "<span class='user guest visual-label' title='" . $this->_("nonexistent user") . "'>"
+                . "<i class='icon' aria-hidden='true'></i>"
+                . $row['username']
+                . "</span>"
+                . $filter;
         } else {
             // check if user still exists and if yes, provide an edit link
             $user = $this->users->get($row['username']);
@@ -487,9 +536,19 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 if (!mb_strlen($user_name)) {
                     $user_name = $user->name;
                 }
-                $data[] = "<a class='user' href='{$this->config->urls->admin}access/users/edit/?id={$user->id}'>{$user_name}</a>{$filter}";
+                $data[] = "<a class='user' href='{$this->config->urls->admin}access/users/edit/?id={$user->id}'>"
+                    . "<i class='icon' aria-hidden='true'></i>"
+                    . "<span class='visually-hidden'>" . sprintf($this->_('Edit user: %s'), $user_name). "</span>"
+                    . "<span class='visual-label' aria-hidden='true'>{$user_name}</span>"
+                    . "</a>"
+                    . $filter;
             } else {
-                $data[] = "<span class='user deleted' title='" . $this->_("deleted") . "'>{$row['username']}</span>{$filter}";
+                $label = $this->_("deleted user");
+                $data[] = "<span class='user deleted visual-label' title='{$label}' aria-label='{$label}: {$row['username']}'>"
+                    . "<i class='icon' aria-hidden='true'></i>"
+                    . "<span class='visual-label' aria-hidden='true'>{$row['username']}</span>"
+                    . "</span>"
+                    . $filter;
             }
         }
 
@@ -506,15 +565,19 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                         )
                     )
                 );
-                $data[] = "<a class='ajax tag ip_address{$selected}' href='?{$query_string}'>{$row['ip_address']}</a>";
+                $label = $this->_("IP address");
+                $data[] = "<a class='ajax tag ip_address{$selected}' href='?{$query_string}' aria-label='{$label}: {$row['ip_address']}'>"
+                    . $row['ip_address']
+                    . "</a>";
             } else {
                 $data[] = null;
             }
         }
 
         // status of login attempt
-        $status = $this->_("No");
-        if ($row['login_was_successful']) $status = $this->_("Yes");
+        $status = $row['login_was_successful']
+            ? $this->_("Yes")
+            : $this->_("No");
         $selected = $this->input->get->login_was_successful == $row['login_was_successful'] ? ' selected' : '';
         $query_string = htmlentities(
             http_build_query(
@@ -528,18 +591,14 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $data[] = "<a class='ajax tag status{$selected} status-" . ($row['login_was_successful'] ? 'yes' : 'no') . "' href='?{$query_string}'>{$status}</a>";
 
         // link for removing individual row
-        if (!$this->optional_permissions['remove']->id || $this->user->hasPermission($this->optional_permissions['remove'])) {
-            $data[] = "<a href='./delete/?id={$row['id']}' class='action remove-row'>" . $this->_("remove?") . "</a>";
-        } else {
-            $data[] = "";
-        }
+        $data[] = !$this->optional_permissions['remove']->id || $this->user->hasPermission($this->optional_permissions['remove'])
+            ? "<a href='./delete/?id={$row['id']}' class='action remove-row'>" . $this->_("remove?") . "</a>"
+            : "";
 
         // environment and user agent
-        if ($row['user_agent']) {
-            $data[] = $this->renderBrowserInfo($row['user_agent'], $row['user_agent_features']);
-        } else {
-            $data[] = $this->_("No data available.");
-        }
+        $data[] = $row['user_agent']
+            ? $this->renderBrowserInfo($row['user_agent'], $row['user_agent_features'])
+            : $this->_("No data available.");
 
         return $data;
     }
@@ -550,7 +609,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * @param array $row
      * @return string
      */
-    private function parseString(array $row) {
+    private function parseString(array $row): string {
 
         $out = [];
 
@@ -662,7 +721,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      *
      * @return string 
      */
-    private function renderFilters() {
+    private function renderFilters(): string {
 
         $markup = "";
 
@@ -672,14 +731,14 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $this->_("Successful login attempts") => "1",
             $this->_("Unsuccessful login attempts") => "0",
         ];
-        $markup .= $this->renderSelect('login_was_successful', $options);
+        $markup .= $this->renderSelect('login_was_successful', $this->_('Login was successful'), $options);
 
         // username
         $options = [];
         $login = $this->input->get->login_was_successful;
         $where = ($login == "1" || $login == "0") ? " WHERE login_was_successful = {$login}" : "";
         $sql = "SELECT DISTINCT username 
-                FROM {$this->table_name}
+                FROM " . self::TABLE_NAME . "
                 {$where} 
                 ORDER BY username DESC";
         $stmt = $this->database->prepare($sql);
@@ -691,8 +750,8 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
             $options[] = $row['username'];
         }
-        $markup .= "<span class='text-label'>" . $this->_('by') . "</span>"
-            . $this->renderSelect('username', $options);
+        $markup .= "<span class='filter-label' aria-hidden='true'>" . $this->_('by') . "</span>"
+            . $this->renderSelect('username', $this->_('Username'), $options);
 
         // Real/removed/nonexistent users
         $options = [
@@ -701,7 +760,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $this->_("limited to nonexisting users") => "0",
         ];
         $attrs = ['data-disabled-title' => $this->_("Not relevant in this context")];
-        $markup .= $this->renderSelect('user_id', $options, ['attrs' => $attrs]);
+        $markup .= $this->renderSelect('user_id', $this->_('User ID'), $options, ['attrs' => $attrs]);
 
         // When
         $options = [
@@ -712,7 +771,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $this->_("within a year") => '1 YEAR',
             $this->_("between") => "between",
         ];
-        $markup .= $this->renderSelect('when', $options);
+        $markup .= $this->renderSelect('when', $this->_('When'), $options);
 
         // Date range
         $disabled_title = $this->_("Not relevant in this context");
@@ -741,34 +800,37 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                  . " />"
                  . "</div>";
 
-        if ($markup) {
-            /** @var InputfieldForm */
-            $form = $this->modules->get('InputfieldForm');
-            $form->attr('id', 'filters');
-            $form->attr('method', 'get');
-            /** @var InputfieldFieldset */
-            $fieldset = $this->modules->get('InputfieldFieldset');
-            $fieldset->label = $this->_('Filters');
-            $fieldset->icon = 'filter';
-            $field = $this->modules->get('InputfieldMarkup');
-            $field->markupText = $markup;
-            $fieldset->append($field);
-            $form->append($fieldset);
-            return $form->render();
-        }
+        /** @var InputfieldForm */
+        $form = $this->modules->get('InputfieldForm');
+        $form->attr('id', 'filters');
+        $form->attr('method', 'get');
+
+        /** @var InputfieldFieldset */
+        $fieldset = $this->modules->get('InputfieldFieldset');
+        $fieldset->label = $this->_('Filters');
+        $fieldset->icon = 'filter';
+
+        /** @var InputfieldMarkup */
+        $field = $this->modules->get('InputfieldMarkup');
+        $field->markupText = '<div class="filters">' . $markup . '</div>';
+        $fieldset->append($field);
+        $form->append($fieldset);
+
+        return $form->render();
     }
 
     /**
      * Render markup for select element
      *
      * @param string $name
+     * @param string $label
      * @param array $options
      * @param array $settings
      * @return string
      */
-    private function renderSelect($name, array $options, array $settings = []) {
+    private function renderSelect(string $name, string $label, array $options, array $settings = []): string {
 
-        if (!$name) return;
+        if (empty($name)) return '';
 
         $disabled = "";
         if (count($options) < 2) {
@@ -786,25 +848,32 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         foreach ($options as $key => $option) {
             $value = $key ? $option : '';
             $text = !is_numeric($key) ? $key : $option;
-            if (isset($settings['translate'])) $text = $this->_($text);
+            if (isset($settings['translate'])) {
+                $text = $this->_($text);
+            }
             $selected = $this->input->get->$name == $value ? ' selected="selected"' : '';
             $markup .= "<option{$selected} value='{$value}' name='{$name}'>{$text}</option>";
         }
 
-        return "<div class='filter'{$disabled}><select name='{$name}'{$disabled}{$attrs}>{$markup}</select></div>";
+        return "<label class='filter'{$disabled}>"
+            . "<i class='icon icon--before' aria-hidden='true'></i>"
+            . "<span class='visually-hidden'>{$label}</span>"
+            . "<select name='{$name}'{$disabled}{$attrs}>{$markup}</select>"
+            . "<i class='icon icon--after' aria-hidden='true'></i>"
+            . "</label>";
     }
 
     /**
      * Render human readable view of browser / platform information
      *
-     * @param string $user_agent
-     * @param string $user_agent_features
+     * @param string|null $user_agent
+     * @param string|null $user_agent_features
      * @return string
      */
-    private function renderBrowserInfo($user_agent = null, $user_agent_features = null) {
+    private function renderBrowserInfo(?string $user_agent = null, ?string $user_agent_features = null): string {
 
         // user agent string is required
-        if (!$user_agent) return false;
+        if (empty($user_agent)) return '';
 
         // init vars
         $markup = "";
@@ -812,9 +881,9 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $features = $user_agent_features ? json_decode($user_agent_features) : null;
 
         // basic information from user agent string
-        $markup .= "<tr><th>" . $this->_("Browser") . "</th><td>{$browser->browser} {$browser->version}</td></tr>";
-        $markup .= "<tr><th>" . $this->_("Platform") . "</th><td>{$browser->platform}</td></tr>";
-        $markup .= "<tr id='device-type'><th>" . $this->_("Device Type") . "</th><td>{$browser->device}</td></tr>";
+        $markup .= "<tr><th>" . $this->_("Browser") . "</th><td>" . ($browser->browser == 'unknown' ? $this->_('unknown') : $browser->browser) . " {$browser->version}</td></tr>";
+        $markup .= "<tr><th>" . $this->_("Platform") . "</th><td>" . ($browser->platform == 'unknown' ? $this->_('unknown') : $browser->platform) . "</td></tr>";
+        $markup .= "<tr id='device-type'><th>" . $this->_("Device Type") . "</th><td>" . (in_array($browser->platform, ['desktop', 'mobile', 'tablet', 'unknown']) ? $this->_($browser->platform) : $browser->platform) . "</td></tr>";
 
         if ($features) {
 
@@ -841,13 +910,13 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             // screen size
             $markup .= "<tr><th>" . $this->_("Screen") . "</th><td>";
             if (isset($features->screen) && $features->screen) $markup .= $features->screen;
-            else $markup .= $this->_("unidentified");
+            else $markup .= $this->_("Unidentified");
             $markup .= "</td></tr>";
 
             // window size
             $markup .= "<tr><th>" . $this->_("Window") . "</th><td>";
             if (isset($features->window) && $features->window) $markup .= $features->window;
-            else $markup .= $this->_("unidentified");
+            else $markup .= $this->_("Unidentified");
             $markup .= "</td></tr>";
 
         } else {
@@ -879,11 +948,32 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             $browser->browser == "msie" ? "internet-explorer" : (in_array(mb_strtolower($browser->browser), $browser_icons) ? mb_strtolower($browser->browser) : ""),
         ]);
         if (!empty($icons)) {
-            array_walk($icons, function(&$i) { $i = $i ? "<i class='fa fa-{$i}'></i>" : ""; });
+            $icon_labels = [
+                'apple' => 'Apple',
+                'windows' => 'Windows',
+                'android' => 'Android',
+                'linux' => 'Linux',
+                'chrome' => 'Chrome',
+                'firefox' => 'Firefox',
+                'internet-explorer' => 'Internet Explorer',
+                'edge' => 'Edge',
+                'safari' => 'Safari',
+                'opera' => 'Opera',
+                'question-circle' => $this->_('Unrecognized device'),
+                'desktop' => $this->_('Desktop'),
+                'tablet' => $this->_('Tablet'),
+                'mobile' => $this->_('Mobile'),
+            ];
+            array_walk($icons, function(&$i) use ($icon_labels) {
+                $i = $i && isset($icon_labels[$i]) ? "<i class='fa fa-{$i}'></i><span class='visually-hidden'>{$icon_labels[$i]}</span>" : "";
+            });
             $icon_str = "<div class='icons'>" . implode($icons) . "</div>";
         }
 
-        return "{$icon_str}<table class='details'>{$markup}</table>";
+        return "<div class='details-table'>"
+            . $icon_str
+            . "<table class='details' tabindex='-1'>{$markup}</table>"
+            . "</div>";
     }
 
     /**
@@ -893,26 +983,29 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      * that cannot be set run-time. This is why we're introducing an alternative
      * method that provides the most rudimentary features without any extra fuss.
      *
-     * @param string $user_agent
+     * @param string|null $user_agent
      * @return \stdClass|null
      */
-    private function get_browser_alt($user_agent = null) {
+    private function get_browser_alt(?string $user_agent = null): ?\stdClass {
 
         if (!$user_agent) return null;
 
         // empty container object for browser info
         $b = new \stdClass();
-        $b->browser = $this->_("unknown");
+        $b->browser = 'unknown';
         $b->version = null;
         $b->majorver = 0;
         $b->minorver = 0;
         $b->revision = 0;
-        $b->platform = $this->_("unknown");
-        $b->device = $this->_("desktop");
+        $b->platform = 'unknown';
+        $b->device = 'desktop';
 
         // very rough device type detection
-        if (preg_match("/iPad|Tablet|; GT-/i", $user_agent)) $b->device = $this->_("tablet");
-        else if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) $b->device = $this->_("mobile");
+        if (preg_match("/iPad|Tablet|; GT-/i", $user_agent)) {
+            $b->device = 'tablet';
+        } else if (preg_match("/Android|webOS|iPhone|iPod|BlackBerry/i", $user_agent)) {
+            $b->device = 'moble';
+        }
 
         // identify platform
         if (preg_match("/\(([a-zA-Z0-9\.;:\/\-_ ]+)\)/", $user_agent, $match)) {
@@ -938,7 +1031,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         ];
 
         // identify current browser
-        foreach($browsers as $browser) {
+        foreach ($browsers as $browser) {
             if (preg_match("/([a-z]*?[ ]?{$browser})[\/ ]?([0-9.]*)/i", $user_agent, $match)) {
                 $b->browser = trim($match[1]);
                 if (!$b->version) $b->version = $match[2];
