@@ -24,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.6.1',
+            'version' => '1.6.2',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -532,8 +532,17 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         // load main modules styles and add created markup to edit form
         $this->config->styles->add($this->config->urls->ProcessLoginHistory."ProcessLoginHistory.css?v=102");
-        $submit = $event->return->find('name=submit_save')->first();
-        $event->return->insertBefore($field, $submit);
+        $content = $event->return->find('id=ProcessPageEditContent')->first();
+        if ($content) {
+            $content->append($field);
+        } else {
+            $submit = $event->return->find('name=submit_save')->first();
+            if ($submit) {
+                $event->return->insertBefore($field, $submit);
+            } else {
+                $event->return->append($field);
+            }
+        }
     }
 
     /**
