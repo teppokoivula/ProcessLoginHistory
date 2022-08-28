@@ -24,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.6.0',
+            'version' => '1.6.1',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -492,27 +492,21 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         $markup = "";
         while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
 
-            $login_date = date($date_format, strtotime($row['login_timestamp']));
+            $login_time = strtotime($row['login_timestamp']);
+            $login_date = date($date_format, $login_time);
 
-            // make sure that currently used PHP version has DateTime implemented
-            if (version_compare(PHP_VERSION, '5.3.0') >= 0) {
-                $date_diff = date_diff(date_create(), date_create($login_date));
-                if ($date_diff->format('%a') < 1) {
-                    // less than a day since this login attempt
-                    $date_diff = $date_diff->format('%h');
-                    if ($date_diff < 1) $date_diff = $this->_("less than an hour ago");
-                    else $date_diff = sprintf($this->_n("one hour ago", "%d hours ago", $date_diff), $date_diff);
-                } else {
-                    // one or more days since this login attempt
-                    $date_diff = $date_diff->format('%a');
-                    $date_diff = sprintf($this->_n("one day ago", "%d days ago", $date_diff), $date_diff);
-                }
-                $date_diff = ", " . $date_diff;
+            $date_diff = date_diff(new \DateTime(), (new \DateTime())->setTimestamp($login_time));
+            if ($date_diff->format('%a') < 1) {
+                // less than a day since this login attempt
+                $date_diff = $date_diff->format('%h');
+                if ($date_diff < 1) $date_diff = $this->_("less than an hour ago");
+                else $date_diff = sprintf($this->_n("one hour ago", "%d hours ago", $date_diff), $date_diff);
             } else {
-                // calculating date differences tends to get messy and there's no
-                // real need to offer alternative solution for older PHP versions
-                $date_diff = "";
+                // one or more days since this login attempt
+                $date_diff = $date_diff->format('%a');
+                $date_diff = sprintf($this->_n("one day ago", "%d days ago", $date_diff), $date_diff);
             }
+            $date_diff = ", " . $date_diff;
 
             // was login attempt successful?
             $status = $this->_("unsuccessful attempt");
