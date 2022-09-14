@@ -508,7 +508,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * @param string $login_timestamp
      * @return bool
      */
-    protected function rowExists(int $user_id, string $username, int $login_was_successful, string $login_timestamp) {
+    protected function rowExists(int $user_id, string $username, int $login_was_successful, string $login_timestamp): bool {
         $sql = "SELECT 1
                 FROM " . self::TABLE_NAME . "
                 WHERE user_id=:user_id AND username=:username AND login_was_successful=:login_was_successful AND login_timestamp=:login_timestamp
@@ -534,7 +534,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * @param string|null $login_timestamp
      * @return bool true on success, false on failure
      */
-    protected function insert(int $user_id, string $username, int $login_was_successful, string $user_agent, ?string $user_agent_features, ?string $ip_address, ?string $login_timestamp = null) {
+    protected function insert(int $user_id, string $username, int $login_was_successful, string $user_agent, ?string $user_agent_features, ?string $ip_address, ?string $login_timestamp = null): bool {
         $sql = "INSERT INTO " . self::TABLE_NAME . "
                 (user_id, username, login_was_successful, user_agent, user_agent_features, ip_address" . ($login_timestamp === null ? '' : ', login_timestamp') . ") VALUES
                 (:user_id, :username, :login_was_successful, :user_agent, :user_agent_features, :ip_address" . ($login_timestamp === null ? '' : ', :login_timestamp') . ")";
@@ -742,7 +742,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      *
      * @return string IP address
      */
-    protected function getIP() {
+    protected function getIP(): string {
 
         // Use REMOTE_ADDR with a fallback to localhost.
         $ip_address = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
@@ -768,7 +768,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         // Sanitize by converting to and from integer.
         $ip_address = long2ip(ip2long(trim($ip_address)));
 
-        return $ip_address;
+        return $ip_address ?: '';
     }
 
 }
