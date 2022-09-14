@@ -24,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.6.2',
+            'version' => '1.7.0',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -186,6 +186,22 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         $field->icon = "trash";
         $data_retention->add($field);
 
+        // advanced settings
+        $advanced_settings = $this->modules->get('InputfieldFieldset');
+        $advanced_settings->label = $this->_('Advanced settings');
+        $advanced_settings->icon = 'graduation-cap';
+        $advanced_settings->collapsed = Inputfield::collapsedYes;
+        $fields->add($advanced_settings);
+
+        // import from session log
+        $field = $this->modules->get("InputfieldCheckbox");
+        $field->name = "import_from_session_log";
+        $field->label = __("Import data from the session log file");
+        $field->description = __("ProcessWire logs login attempts into the session log file. Check this option and save module settings if you want to import those attempts into login history database.");
+        $field->notes = __('Note: this operation may take a long time, and if run multiple times it can also create duplicate records.');
+        $field->icon = "download";
+        $advanced_settings->add($field);
+
         return $fields;
     }
 
@@ -301,6 +317,86 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             }
             $event->arguments(2, null);
         }
+
+        // check if "import from session log" option is checked
+        $data = $event->arguments[1];
+        if (is_array($data) && !empty($data['import_from_session_log']) || $data === 'import_from_session_log' && !empty($event->arguments[2])) {
+
+            // path to session log file
+            $session_log_file = $this->config->paths->logs . 'session.txt';
+
+            // attempt to read log file and import rows
+            if (is_readable($session_log_file)) {
+                $handle = fopen($session_log_file, 'r');
+                if ($handle) {
+                    $new_rows = 0;
+                    $old_rows = 0;
+                    $err_rows = 0;
+                    $user_ids = [];
+                    while (($log_row = fgets($handle)) !== false) {
+
+                        $log_row = explode("\t", $log_row);
+
+                        // format login timestamp; bail out early if timestamp is missing or unusable
+                        $login_timestamp = empty($log_row[0]) ? false : strtotime($log_row[0]);
+                        if ($login_timestamp === false) continue;
+                        $login_timestamp = date('Y-m-d H:i:s', $login_timestamp);
+
+                        // check if this login attempt was successful
+                        $login_was_successful = empty($log_row[3]) ? 0 : (strpos($log_row[3], 'Successful') === 0 ? 1 : 0);
+
+                        // get username; bail out early if username is not found
+                        $username = $login_was_successful && !empty($log_row[1]) ? $this->sanitizer->username($log_row[1]) : null;
+                        if (!empty($log_row[3]) && !$login_was_successful) {
+                            preg_match('/Failed login for \'(.+?)\'/', $log_row[3], $matches);
+                            $username = $this->sanitizer->username($matches[1]);
+                        }
+                        if (empty($username)) continue;
+
+                        // fetch and cache user ID; use 0 as ID for missing users
+                        if (!isset($user_ids[$username])) {
+                            $user_obj = $this->users->get('name=' . $username);
+                            $user_ids[$username] = $user_obj->id ?: 0;
+                        }
+
+                        if ($this->rowExists($user_ids[$username], $username, $login_was_successful, $login_timestamp)) {
+                            ++$old_rows;
+                            continue;
+                        }
+
+                        if ($this->insert($user_ids[$username], $username, $login_was_successful, '', null, null, $login_timestamp)) {
+                            ++$new_rows;
+                        } else {
+                            ++$err_rows;
+                        }
+                    }
+                    fclose($handle);
+                    $this->message(sprintf(
+                        $this->_('Imported %d new rows from session log. %d existing rows were skipped.'),
+                        $new_rows,
+                        $old_rows
+                    ));
+                    if ($err_rows) {
+                        $this->error(sprintf(
+                            $this->_('%d rows in session log contained errors and could not be imported.'),
+                            $err_rows
+                        ));
+                    }
+                }
+            } else {
+                $this->warning(sprintf(
+                    $this->_('Session log file (%s) doesn\'t exist or isn\'t readable, unable to import login history.'),
+                    $session_log_file
+                ));
+            }
+
+            // make sure that "import from session log" option value doesn't get saved
+            if (is_array($data)) {
+                unset($data['import_from_session_log']);
+                $event->arguments(1, $data);
+            }
+            $event->arguments(2, null);
+        }
     }
 
     /**
@@ -404,6 +500,29 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     }
 
     /**
+     * Check if row exists in database
+     *
+     * @param int $user_id
+     * @param string $username
+     * @param int $login_was_successful
+     * @param string $login_timestamp
+     * @return bool
+     */
+    protected function rowExists(int $user_id, string $username, int $login_was_successful, string $login_timestamp) {
+        $sql = "SELECT 1
+                FROM " . self::TABLE_NAME . "
+                WHERE user_id=:user_id AND username=:username AND login_was_successful=:login_was_successful AND login_timestamp=:login_timestamp
+                LIMIT 1";
+        $stmt = $this->database->prepare($sql);
+        $stmt->bindValue(':user_id', $user_id, \PDO::PARAM_INT);
+        $stmt->bindValue(':username', $username, \PDO::PARAM_STR);
+        $stmt->bindValue(':login_was_successful', $login_was_successful, \PDO::PARAM_INT);
+        $stmt->bindValue(':login_timestamp', $login_timestamp, \PDO::PARAM_STR);
+        $stmt->execute();
+        return $stmt->fetchColumn() ? true : false;
+    }
+
+    /**
      * Insert row into database
      *
      * @param int $user_id
@@ -412,11 +531,13 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
      * @param string $user_agent
      * @param string|null $user_agent_features
      * @param string|null $ip_address
+     * @param string|null $login_timestamp
+     * @return bool true on success, false on failure
      */
-    protected function insert(int $user_id, string $username, int $login_was_successful, string $user_agent, ?string $user_agent_features, ?string $ip_address) {
-        $sql = "INSERT INTO " . self::TABLE_NAME . " " .
-               "(user_id, username, login_was_successful, user_agent, user_agent_features, ip_address) VALUES " .
-               "(:user_id, :username, :login_was_successful, :user_agent, :user_agent_features, :ip_address) ";
+    protected function insert(int $user_id, string $username, int $login_was_successful, string $user_agent, ?string $user_agent_features, ?string $ip_address, ?string $login_timestamp = null) {
+        $sql = "INSERT INTO " . self::TABLE_NAME . "
+                (user_id, username, login_was_successful, user_agent, user_agent_features, ip_address" . ($login_timestamp === null ? '' : ', login_timestamp') . ") VALUES
+                (:user_id, :username, :login_was_successful, :user_agent, :user_agent_features, :ip_address" . ($login_timestamp === null ? '' : ', :login_timestamp') . ")";
         try {
             $stmt = $this->database->prepare($sql); 
             $stmt->bindValue(':user_id', $user_id, \PDO::PARAM_INT);
@@ -425,9 +546,14 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             $stmt->bindValue(':user_agent', $user_agent, \PDO::PARAM_STR);
             $stmt->bindValue(':user_agent_features', $user_agent_features, \PDO::PARAM_STR);
             $stmt->bindValue(':ip_address', $ip_address, \PDO::PARAM_STR);
+            if ($login_timestamp !== null) {
+                $stmt->bindValue(':login_timestamp', $login_timestamp, \PDO::PARAM_STR);
+            }
             $stmt->execute();
+            return true;
         } catch(\Exception $e) {
             $this->error($e->getMessage());
+            return false;
         }
     }
 

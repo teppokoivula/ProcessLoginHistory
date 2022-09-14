@@ -236,6 +236,10 @@ table.log tr.more > td > div {
     padding: 1.25em 1em 1.25em 6em;
 }
 
+table.log tr.more > td > div.no-data {
+    padding: 1.25em;
+}
+
 table.log tr.more > td > div .icons {
     text-align: center;
     position: absolute;
