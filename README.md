@@ -38,7 +38,7 @@ In order to access the Login History page, users need to a) be authenticated and
 As of version 1.9.0, there are a couple of ways to retrieve user login history via the API:
 
 * `$this->modules->get('ProcessLoginHistoryHooks')->getUserLoginHistory($user, $start, $limit, $login_was_successful)` returns login history data for provided ProcessWire User object. Default values are 0 for "start", 2 for "limit", and 1 for "login_was_successful", which means that by default this method will return latest successful login and the one before that. Return value is always an array; in case there are no results, an empty array is returned.
-* `$user->getLoginHistory($start, $limit, $login_was_successful)` does the same as previous command for a specific User object. All arguments are optional. This method returns a single timestamp (when limit is 1), an array of login history, or null in case there are no results. By default timestamps for last two successful logins are returned.
+* `$user->getLoginHistory($start, $limit, $login_was_successful)` does the same as previous command for a specific User object. All arguments are optional. This method returns a single timestamp (when limit is 1, or an integer value is provided for the "start" argument and "limit" argument is omitted), an array of login history, or null in case there are no results. By default timestamps for last two successful logins are returned.
 
 ### Login History RSS feed
 
