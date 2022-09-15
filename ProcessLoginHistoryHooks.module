@@ -24,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.7.0',
+            'version' => '1.8.0',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -223,6 +223,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         // hook after login to save login info into db 
         $this->addHookAfter('Session::login', $this, 'hookLogin');
+
+        // add getLoginHistory method for users
+        $this->addHookMethod('User::getLoginHistory', $this, 'hookLoginHistory');
 
         // hook after ProcessLogin::buildLoginForm and Tfa::buildAuthCodeForm to add useful extra fields
         $this->addHookAfter('ProcessLogin::buildLoginForm', $this, 'hookBuildLoginForm');
@@ -595,7 +598,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
 
         // get latest login attempts (return if no rows are found)
         $sql = "SELECT id, login_timestamp, login_was_successful 
-                FROM " . self::TABLE_NAME . " 
+                FROM " . self::TABLE_NAME . "
                 WHERE user_id=:user_id
                 ORDER BY login_timestamp DESC
                 LIMIT 3";
@@ -669,6 +672,54 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
                 $event->return->append($field);
             }
         }
+    }
+
+    /**
+     * Get login history for user
+     *
+     * @param User $user
+     * @param int $start
+     * @param int $limit
+     * @param int|null $login_was_successful
+     * @return array
+     */
+    public function getUserLoginHistory(User $user, int $start = 0, int $limit = 2, ?int $login_was_successful = 1): array {
+
+        // bail out early if user is not logged in or has no ID
+        if (!$user->id || !$user->isLoggedin()) {
+            return [];
+        }
+
+        // get latest login attempts (return if no rows are found)
+        $sql = "SELECT login_timestamp
+                FROM " . self::TABLE_NAME . "
+                WHERE user_id=:user_id
+                " . ($login_was_successful !== null ? "AND login_was_successful = :login_was_successful" : "") . "
+                ORDER BY login_timestamp DESC
+                LIMIT :start, :limit";
+        $stmt = $this->database->prepare($sql);
+        $stmt->bindValue(':user_id', $user->id, \PDO::PARAM_INT);
+        $stmt->bindValue(':start', $start, \PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        if ($login_was_successful !== null) {
+            $stmt->bindValue(':login_was_successful', $login_was_successful === 0 ? 0 : 1, \PDO::PARAM_INT);
+        }
+        $stmt->execute();
+
+        return $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * Hook method that returns login history for user
+     *
+     * @param HookEvent $event
+     */
+    protected function hookLoginHistory(HookEvent $event) {
+        $start = (int) ($event->arguments[0] ?? 0);
+        $limit = (int) ($event->arguments[1] ?? (isset($event->arguments[0]) && is_int($event->arguments[0]) && $event->arguments[0] >= 0 ? 1 : 2));
+        $login_was_successful = array_key_exists(1, $event->arguments) ? $event->arguments[2] : 1;
+        $login_history = $this->getUserLoginHistory($event->object, $start, $limit, $login_was_successful);
+        $event->return = $limit === 1 ? ($login_history[0] ?? null) : ($login_history ?: null);
     }
 
     /**
