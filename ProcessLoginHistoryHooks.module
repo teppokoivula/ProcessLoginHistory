@@ -24,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.8.1',
+            'version' => '1.8.2',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -364,6 +364,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
                             $user_obj = $this->users->get('name=' . $username);
                             $user_ids[$username] = $user_obj->id ?: 0;
                         }
+
+                        // if user ID is missing and logging nonexistent users is disabled, skip current row
+                        if (empty($user_ids[$username]) && empty($data['log_nonexistent_users'])) continue;
 
                         if ($this->rowExists($user_ids[$username], $username, $login_was_successful, $login_timestamp)) {
                             ++$old_rows;
