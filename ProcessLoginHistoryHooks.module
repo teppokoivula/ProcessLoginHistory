@@ -24,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.8.0',
+            'version' => '1.8.1',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -339,6 +339,9 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
                     while (($log_row = fgets($handle)) !== false) {
 
                         $log_row = explode("\t", $log_row);
+
+                        // we're only interested in login rows
+                        if (empty($log_row[3]) || !strpos((string) $log_row[3], ' login for ')) continue;
 
                         // format login timestamp; bail out early if timestamp is missing or unusable
                         $login_timestamp = empty($log_row[0]) ? false : strtotime($log_row[0]);
