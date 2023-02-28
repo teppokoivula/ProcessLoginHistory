@@ -8,7 +8,7 @@
  *
  * For more information see README.md.
  *
- * @copyright 2012-2022 Teppo Koivula
+ * @copyright 2012-2023 Teppo Koivula
  * @license https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt GNU General Public License, version 2
  */
 class ProcessLoginHistory extends Process implements ConfigurableModule {
@@ -24,7 +24,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.9.2',
+            'version' => '1.9.3',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',

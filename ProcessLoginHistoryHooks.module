@@ -8,7 +8,7 @@
  * 
  * For more information see README.md.
  *
- * @copyright 2012-2022 Teppo Koivula
+ * @copyright 2012-2023 Teppo Koivula
  * @license https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt GNU General Public License, version 2
  */
 class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableModule {
@@ -24,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.8.2',
+            'version' => '1.8.3',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -418,7 +418,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
     public function hookLogin(HookEvent $event) {
 
         // default values
-        $user_agent = $this->database->escapeStr($_SERVER['HTTP_USER_AGENT']);
+        $user_agent = isset($_SERVER['HTTP_USER_AGENT']) ? $this->database->escapeStr($_SERVER['HTTP_USER_AGENT']) : '';
         $user_agent_features = [];
         $login_was_successful = 0;
         $user = null;
