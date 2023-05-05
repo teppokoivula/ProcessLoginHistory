@@ -2,9 +2,9 @@ Process Login History Module
 ============================
 
 Login History module for ProcessWire CMS/CMF.
-Copyright (c) 2012-2022 Teppo Koivula
+Copyright (c) 2012-2023 Teppo Koivula
 
-This module keeps track of login attempts to your site, both successful and unsuccessful (though tracking unsuccessful logins is off by default) in order to offer better understanding about users' activity and environments they use and/or favor; browsers, browser features such as Flash / JavaScript, devices, screen and window sizes, etc.
+This module keeps track of login attempts to your site, both successful and unsuccessful (though tracking unsuccessful logins is off by default) in order to offer better understanding about users' activity and environments they use and/or favor; browsers, browser features such as JavaScript, devices, screen and window sizes, etc.
 
 Please note that there are much better solutions -- such as Google Analytics -- for tracking general site usage. This module isn't intended to replace those, it just offers slightly closer integration with specific ProcessWire features.
 
@@ -51,6 +51,27 @@ Since the latter feed can be accessed via a public URL, please make sure that yo
 This module contains a bunch of settings you should be aware of. Settings can be defined via ProcessWire's native module configuration screen, and each of the bundled module's has it's own settings.
 
 *See Process Login History, Process Login History Hooks, and Process Login History RSS module config screens for more details.*
+
+### Overriding settings in site config
+
+Settings can be defined via `$config->ProcessLoginHistory` array. Once defined here, these settings cannot be modified in module config screen:
+
+```
+$config->ProcessLoginHistory = [
+    'row_limit' => 25,
+    'date_format' => 'Y-m-d H:i:s',
+    'user_label_format' => '{name}',
+    'rss_content_type' => 0,
+    'allow_remove' => 1,
+];
+```
+
+## Permissions
+
+Superusers will, by default, always have access to all module features. Following permissions can be used to control what non-superusers are allowed to do:
+
+- login-history: grants access to login history data and all non-restricted features, such as removing rows
+- login-history-remove: if this optional permission has been added, only users with this permission can remove rows
 
 ## Roadmap
 
