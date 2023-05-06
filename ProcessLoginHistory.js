@@ -83,7 +83,7 @@ $(document).ready(function() {
 
         // hide irrelevant options in filter form
         var $when = $filters.find('select[name=when]');
-        if ($when.length && $when.attr('value') != "between") {
+        if ($when.length && $when.val() != "between") {
             $filters.find('.log-datepicker')
                 .parent('div')
                 .addClass('disabled')
