@@ -24,7 +24,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.10.2',
+            'version' => '1.10.3',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -961,12 +961,6 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             // javascript support
             $markup .= "<tr><th>JavaScript</th><td>";
             if (isset($features->javascript) && $features->javascript) $markup .= $this->_("Enabled");
-            else $markup .= $this->_("Disabled");
-            $markup .= "</td></tr>";
-
-            // flash support
-            $markup .= "<tr><th>Flash</th><td>";
-            if (isset($features->flash) && $features->flash) $markup .= $this->_("Enabled");
             else $markup .= $this->_("Disabled");
             $markup .= "</td></tr>";
 

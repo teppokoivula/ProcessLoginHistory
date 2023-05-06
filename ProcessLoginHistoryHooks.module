@@ -24,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.8.4',
+            'version' => '1.8.5',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -458,7 +458,6 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
         }
 
         // user agent features
-        if (!empty($_POST['flash'])) $user_agent_features['flash'] = 1;
         if (!empty($_POST['javascript'])) $user_agent_features['javascript'] = 1;
         if (!empty($_POST['screen'])) $user_agent_features['screen'] = $this->sanitizeScreenSize($_POST['screen']);
         if (!empty($_POST['window'])) $user_agent_features['window'] = $this->sanitizeScreenSize($_POST['window']);
