@@ -24,7 +24,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             'summary' => 'Hooks required by Process Login History for collecting data',
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.8.3',
+            'version' => '1.8.4',
             'singular' => true,
             'autoload' => true,
             'requires' => 'ProcessLoginHistory',
@@ -774,7 +774,7 @@ class ProcessLoginHistoryHooks extends WireData implements Module, ConfigurableM
             user_agent_features TEXT DEFAULT NULL,
             login_was_successful BOOLEAN DEFAULT 0,
             login_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE = MYISAM;
+        );
         ";
         $this->database->exec($sql);
 
