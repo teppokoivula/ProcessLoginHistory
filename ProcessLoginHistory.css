@@ -162,6 +162,7 @@ table.log tr th:last-child {
 
 table.log tr th:focus {
     outline: .125rem solid #326dca;
+    outline-offset: -.125rem;
 }
 
 table.AdminDataList.log tr td .user {
