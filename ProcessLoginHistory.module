@@ -559,7 +559,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // escape values (just a precaution really)
         foreach ($row as $key => $value) {
             if ($key == "user_agent_features") continue;
-            $row[$key] = htmlentities($value);
+            $row[$key] = is_string($value) ? htmlentities($value) : $value;
         }
 
         // timestamp (raw timestamp is hidden and only included to allow proper ordering with JavaScript)
