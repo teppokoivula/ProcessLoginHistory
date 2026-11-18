@@ -22,7 +22,7 @@ class ProcessLoginHistoryRSS extends WireData implements Module, ConfigurableMod
             'summary' => __('Output an RSS feed from Process Login History data'),
             'href' => 'https://modules.processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.2.0',
+            'version' => '1.2.1',
             'singular' => true,
             'autoload' => true,
             'icon' => 'rss',
@@ -78,7 +78,7 @@ class ProcessLoginHistoryRSS extends WireData implements Module, ConfigurableMod
     public function init() {
 
         // make sure that a key is configured and that a valid key was provided for current request
-        if (!is_string($this->key) || !strlen($this->key) || !is_string($this->input->get->key) || $this->input->get->key !== $this->key) {
+        if (!is_string($this->key) || !strlen($this->key) || !is_string($this->input->get->key) || !hash_equals($this->key, (string) $this->input->get->key)) {
             return;
         }
 

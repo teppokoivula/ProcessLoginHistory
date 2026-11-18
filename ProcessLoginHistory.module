@@ -24,7 +24,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
             'summary' => __('Keep track of site login history'),
             'href' => 'https://processwire.com/modules/process-login-history/',
             'author' => 'Teppo Koivula',
-            'version' => '1.10.4',
+            'version' => '1.11.0',
             'singular' => true,
             'autoload' => false,
             'icon' => 'terminal',
@@ -274,7 +274,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // fetch rows from database and add them to our data table
         $query = $this->buildQuery();
         $stmt = $this->database->prepare($query['query']); 
-        $stmt->execute();
+        $stmt->execute($query['params']);
         while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
             $table->row($this->parseTableRow($row, $allow_remove));
         }
@@ -298,6 +298,10 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 'less' => $this->_("less"),
                 'areYouSure' => $this->_("Are you sure?"),
                 'removeFailed' => $this->_("Sorry, remove failed"),
+            ],
+            'csrf' => [
+                'name' => $this->session->CSRF->getTokenName(),
+                'value' => $this->session->CSRF->getTokenValue(),
             ],
         ]);
 
@@ -339,7 +343,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $data = [];
         $query = $this->buildQuery();
         $stmt = $this->database->prepare($query['query']);
-        $stmt->execute();
+        $stmt->execute($query['params']);
         while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
             $data[] = $row;
         }
@@ -367,7 +371,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // fetch rows from database
         $query = $this->buildQuery();
         $stmt = $this->database->prepare($query['query']);
-        $stmt->execute();
+        $stmt->execute($query['params']);
         $guid_base_url = null;
         $process_page = $this->pages->get("template=admin, process=" . $this->modules->getModuleID($this) . ", name=" . self::PAGE_NAME);
         if ($process_page->id) {
@@ -408,6 +412,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // joins, such as "LEFT JOIN table ON table.id = $id".
         $joins = [];
         $where = [];
+        $params = [];
 
         // Allowed keys (GET params used to build queries) are defined here to
         // make sure we're not letting any weird queries get past us.
@@ -433,37 +438,42 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         ];
 
         foreach ($this->input->get as $key => $value) {
-            if (in_array($key, $allowed_keys) && $value != "") {
+            if (in_array($key, $allowed_keys, true) && is_string($value) && $value != "") {
                 $operator = "=";
-                $value = $this->database->escapeStr($value);
                 if (strpos($value, "!") === 0) {
                     $operator = "!=";
                     $value = substr($value, 1);
                 }
                 switch ($key) {
                     case "user_agent":
-                        $where[] = "{$key} LIKE '%{$value}%'";
+                        $params[":w_{$key}"] = "%{$value}%";
+                        $where[] = "{$key} LIKE :w_{$key}";
                         break;
                     case "when":
-                        if (!isset($where['date_from']) && !isset($where['date_until']) && in_array($value, $allowed_intervals)) {
-                            $where[$key] = "DATE_SUB(CURDATE(), INTERVAL {$value}) <= login_timestamp";
+                        // interval is taken from the allowed list, never from user input
+                        $interval = array_search($value, $allowed_intervals, true);
+                        if ($interval !== false && !isset($where['date_from']) && !isset($where['date_until'])) {
+                            $where[$key] = "DATE_SUB(CURDATE(), INTERVAL {$allowed_intervals[$interval]}) <= login_timestamp";
                         }
                         break;
                     case "date_from":
                     case "date_until":
                         if (!isset($where['when'])) {
-                            $value = date("Y-m-d", strtotime($value));
+                            $timestamp = strtotime($value);
+                            if ($timestamp === false) break;
                             $operator = "<=";
                             $time = "23:59";
                             if ($key == "date_from") {
                                 $operator = ">=";
                                 $time = "00:00";
                             }
-                            $where[$key] = "login_timestamp {$operator} '{$value} {$time}'";
+                            $params[":w_{$key}"] = date("Y-m-d", $timestamp) . " {$time}";
+                            $where[$key] = "login_timestamp {$operator} :w_{$key}";
                         }
                         break;
                     default:
-                        $where[] = "{$key} {$operator} '{$value}'";
+                        $params[":w_{$key}"] = $value;
+                        $where[] = "{$key} {$operator} :w_{$key}";
                 }
             }
         }
@@ -477,23 +487,32 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         $count = $group_by ? "DISTINCT " . substr($group_by, 9) : "*";
         $sql = "SELECT COUNT($count) FROM " . self::TABLE_NAME . " {$joins} {$where}";
         $stmt = $this->database->prepare($sql); 
-        $stmt->execute();
+        $stmt->execute($params);
         $row = $stmt->fetch(\PDO::FETCH_NUM);
         $total = reset($row);
 
         // put together LIMIT
         $start = 0;
-        $limit = isset($this->input->get->limit) ? (int) $this->input->get->limit : $this->row_limit;
+        $limit = isset($this->input->get->limit) ? (int) $this->input->get->limit : (int) $this->row_limit;
+        if ($limit < 0) $limit = (int) $this->row_limit; // negative limit is invalid, don't turn it into "no limit"
         if ($limit && $total > $limit) {
-            if ($this->input->get->page) $start = ($this->input->get->page-1)*$limit;
-            if ($start > $total) $start = $total-$limit;
+            $page = max(1, (int) $this->input->get->page);
+            $start = ($page-1)*$limit;
+            if ($start > $total) $start = max(0, $total-$limit);
         }
 
         // put together ORDER BY
-        $sort = $this->input->get->sort ? $this->database->escapeStr($this->input->get->sort) : "-login_timestamp";
+        // only allow sorting by known columns; escapeStr() does not protect identifiers
+        $allowed_sorts = ["id", "user_id", "username", "user_agent", "login_was_successful", "login_timestamp", "ip_address"];
+        $sort = (string) $this->input->get->sort;
         $sort_order = strpos($sort, "-") === 0 ? "DESC" : "ASC";
         if ($sort_order == "DESC") $sort = substr($sort, 1);
-        $order_by = "ORDER BY {$sort} {$sort_order}, id DESC";
+        if (!in_array($sort, $allowed_sorts, true)) {
+            $sort = "login_timestamp";
+            $sort_order = "DESC";
+        }
+        $sort = self::TABLE_NAME . "." . $sort;
+        $order_by = "ORDER BY {$sort} {$sort_order}, " . self::TABLE_NAME . ".id DESC";
 
         // stick pieces together to construct final SQL query
         $query = "SELECT " . self::TABLE_NAME . ".* FROM " . self::TABLE_NAME . " {$joins} {$where} {$group_by} {$order_by}";
@@ -502,6 +521,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // return SQL query along with some additional data
         return [
             'query' => $query,
+            'params' => $params,
             'total' => $total,
             'start' => $start,
             'limit' => $limit,
@@ -518,10 +538,15 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
      */
     public function ___executeDelete() {
         if ($this->allowRemove()) {
-            if ((int) $this->input->get->id != $this->input->get->id) {
+            // state-changing action: require POST and a valid CSRF token (throws WireCSRFException)
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                throw new WireException($this->_("Invalid request method."));
+            }
+            $this->session->CSRF->validate();
+            $id = (int) $this->input->post->id;
+            if ($id < 1) {
                 return false;
             }
-            $id = (int) $this->input->get->id;
             $sql = "DELETE FROM " . self::TABLE_NAME . " WHERE id=:id LIMIT 1";
             $query = $this->database->prepare($sql); 
             $query->bindValue(':id', $id, \PDO::PARAM_INT);
@@ -593,7 +618,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
                 . $filter;
         } else {
             // check if user still exists and if yes, provide an edit link
-            $user = $this->users->get($row['username']);
+            $user = $this->users->get((int) $row['user_id']);
             if ($user->id) {
                 $user_name = trim($user->get($this->user_label_format));
                 if (!mb_strlen($user_name)) {
@@ -799,7 +824,7 @@ class ProcessLoginHistory extends Process implements ConfigurableModule {
         // username
         $options = [];
         $login = $this->input->get->login_was_successful;
-        $where = ($login == "1" || $login == "0") ? " WHERE login_was_successful = {$login}" : "";
+        $where = ($login === "1" || $login === "0") ? " WHERE login_was_successful = " . (int) $login : "";
         $sql = "SELECT DISTINCT username 
                 FROM " . self::TABLE_NAME . "
                 {$where} 
